@@ -32,7 +32,7 @@ Tasks are organized into phases based on dependencies. Within a phase, tasks can
 | Task                                  | Title                         | Complexity | Dependencies |
 | ------------------------------------- | ----------------------------- | ---------- | ------------ |
 | [T-009](T-009-command-safety.md)      | Command Safety Classification | M          | T-002        |
-| [T-010](T-010-trigger-system.md)      | Trigger System                | XL         | T-002, T-009 |
+| [T-010](T-010-trigger-system.md)      | Trigger System                | XL         | T-002        |
 | [T-011](T-011-chat-interface.md)      | Chat Interface                | L          | T-002, T-009 |
 | [T-012](T-012-notification-system.md) | Notification System           | M          | T-010        |
 
@@ -43,9 +43,8 @@ T-001 (Priority Engine) ──────────────────�
 
 T-002 (LLM Integration) ──┬───────────────► T-007 (Task Intake)
                            ├───────────────► T-008 (Context Capture)
-                           ├───────────────► T-009 (Command Safety) ──┬──► T-010 (Trigger System) ──► T-012 (Notifications)
-                           │                                          └──► T-011 (Chat Interface)
-                           └──────────────────────────────────────────────► T-010 (Trigger System)
+                           ├───────────────► T-009 (Command Safety) ──► T-011 (Chat Interface)
+                           └───────────────► T-010 (Trigger System) ──► T-012 (Notifications)
 
 T-003 (Project Mgmt UI)   — independent, but enhances T-004, T-005
 T-005 (Board View)         — independent

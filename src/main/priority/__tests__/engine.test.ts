@@ -472,6 +472,48 @@ describe('Priority Engine', () => {
         expect(result.queueDepth).toEqual({ actionable: 1, waiting: 1 })
       })
 
+      it('excludes tasks with awaiting_approval triggers', () => {
+        const project = db
+          .insert(projects)
+          .values({ name: 'Test Project', priorityRank: 0 })
+          .returning()
+          .get()
+
+        const actionableTask = db
+          .insert(tasks)
+          .values({
+            title: 'Actionable task',
+            projectId: project.id,
+            column: TaskColumn.InProgress,
+            archived: false
+          })
+          .returning()
+          .get()
+
+        const waitingTask = db
+          .insert(tasks)
+          .values({
+            title: 'Waiting for approval task',
+            projectId: project.id,
+            column: TaskColumn.InProgress,
+            archived: false
+          })
+          .returning()
+          .get()
+
+        db.insert(triggers)
+          .values({
+            taskId: waitingTask.id,
+            nlCondition: 'When CI passes',
+            status: TriggerStatus.AwaitingApproval
+          })
+          .run()
+
+        const result = computeFocus(db)
+        expect(result.task?.id).toBe(actionableTask.id)
+        expect(result.queueDepth).toEqual({ actionable: 1, waiting: 1 })
+      })
+
       it('includes tasks with fired triggers', () => {
         const project = db
           .insert(projects)

@@ -49,12 +49,13 @@ export function createMockDb(): AppDatabase {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
       nl_condition TEXT NOT NULL,
-      interpreted_check TEXT,
+      check_script TEXT,
       status TEXT NOT NULL DEFAULT 'pending',
       poll_interval_ms INTEGER NOT NULL DEFAULT 300000,
       failure_count INTEGER NOT NULL DEFAULT 0,
       fired_context TEXT,
       fired_at TEXT,
+      last_error TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )

@@ -175,21 +175,74 @@ When adding or editing a task, the user may specify a trigger condition in **nat
 - "PR #52 gets approved by at least one reviewer"
 - "30 minutes have passed" (simple timer)
 
+The system generates a self-contained shell script to check the condition (see §6.2). The user reviews and approves the script before polling begins.
+
 ### 6.2 Trigger Evaluation
 
-A background agent interprets the natural language trigger condition and translates it into a concrete check that can be performed using available CLI tools and skills.
+When a trigger is created, the system uses an LLM to generate a **self-contained shell script** that checks the condition. The user reviews and approves the script before any execution occurs. At poll time, the system simply runs the script and checks the exit code — no LLM is needed.
+
+**Exit code convention:**
+
+- **Exit 0** — condition met (trigger should fire)
+- **Exit 1** — condition not met (keep polling)
+- **Exit 2+** — error (script failed; increment failure count, apply backoff)
+
+The script's stdout when exiting 0 is captured as the trigger's `firedContext` (e.g., "PR #247 merged by @alice at 2026-02-14T10:00Z").
+
+**User approval flow:**
+
+1. **Generate:** LLM produces a shell script from the natural language condition.
+2. **Review:** The user sees the generated script and can:
+   - **Approve** — the script is accepted as-is.
+   - **Edit** — the user modifies the script, then approves.
+   - **Reject** — the trigger is cancelled; no polling begins.
+3. **Immediate test:** On approval, the script runs once immediately:
+   - Exit 0 → the trigger fires right away (condition already met).
+   - Exit 1 → the trigger enters the polling loop.
+   - Exit 2+ → the trigger is marked failed; the user is shown the error (stderr) and can edit the script.
 
 **Polling schedule:**
 
 - Initial interval: every 5 minutes
-- On repeated failures (CLI errors, network issues, unparseable results): gradual backoff up to every 60 minutes
-- On success (trigger condition met): stop polling, fire the trigger
+- On repeated failures (exit 2+): gradual backoff up to every 60 minutes
+- On success (exit 0): stop polling, fire the trigger
 - On recovery after failure: reset to 5-minute interval
 
 **Execution constraints:**
 
-- Trigger checks are **read-only operations only**. They may not mutate any external state.
-- The background agent has access to the same CLI tools as the chat interface (see §7) but operates under the read-only restriction automatically — no user approval is required for trigger evaluation commands.
+- Scripts run in a sandboxed shell with a 30-second timeout.
+- stdout and stderr are captured for debugging and context.
+- The user has already approved the script, so no further safety classification is needed at poll time.
+
+**File-based integration pattern:**
+
+Trigger scripts can check for the existence of sentinel files, enabling external tools to signal events without a direct API:
+
+```bash
+# Example: check if a Claude Code hook has signaled completion
+FILE="$HOME/.chaos-coordinator/triggers/trigger-${TRIGGER_ID}.signal"
+if [ -f "$FILE" ]; then
+  cat "$FILE"   # stdout becomes firedContext
+  rm "$FILE"
+  exit 0        # condition met
+fi
+exit 1          # not yet
+```
+
+External tools (Claude Code hooks, CI webhooks, cron jobs) create sentinel files to trigger events. A Claude Code hook example:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": { "tool_name": "stop" },
+        "command": "echo 'Agent session completed' > ~/.chaos-coordinator/triggers/trigger-42.signal"
+      }
+    ]
+  }
+}
+```
 
 ### 6.3 Trigger Firing
 
@@ -222,7 +275,7 @@ A general-purpose chat interface is available from any view. It provides convers
 
 All CLI commands executed through the chat interface (or by any agent in the system) are classified before execution:
 
-**Read-only commands** — Commands that inspect state without modifying it (e.g., `gh pr status`, `git log`, `az pipelines runs list`). These execute immediately without user approval. Background trigger agents are restricted to this category.
+**Read-only commands** — Commands that inspect state without modifying it (e.g., `gh pr status`, `git log`, `az pipelines runs list`). These execute immediately without user approval. Trigger scripts are user-approved and bypass command safety classification (see §6.2).
 
 **Potentially mutating commands** — Commands that may change external state (e.g., `gh pr merge`, `git push`, `az pipelines run`). These are **raised to the user for approval** before execution. The user sees the exact command and can approve, modify, or reject it.
 
@@ -290,7 +343,7 @@ Additional CLI integrations can be added over time without architectural changes
 The application requires access to an LLM for:
 
 - Context summary generation (intake and shelving)
-- Natural language trigger interpretation
+- Natural language trigger interpretation (one-time script generation; no LLM needed at poll time)
 - Chat interface responses
 - Command safety classification (if using LLM-based approach)
 

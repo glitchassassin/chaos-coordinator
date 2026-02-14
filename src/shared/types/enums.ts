@@ -9,6 +9,7 @@ export type TaskColumn = (typeof TaskColumn)[keyof typeof TaskColumn]
 
 export const TriggerStatus = {
   Pending: 'pending',
+  AwaitingApproval: 'awaiting_approval',
   Polling: 'polling',
   Fired: 'fired',
   Failed: 'failed',

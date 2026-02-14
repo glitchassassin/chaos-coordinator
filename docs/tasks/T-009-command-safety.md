@@ -16,9 +16,11 @@ updated: 2026-02-14
 
 ## Context
 
-Both the trigger system (T-010) and chat interface (T-011) execute CLI commands. All commands must be classified as read-only or potentially mutating before execution. Read-only commands execute immediately; mutating commands require user approval.
+The chat interface (T-011) executes CLI commands that must be classified as read-only or potentially mutating before execution. Read-only commands execute immediately; mutating commands require user approval.
 
-ADR 003 specifies: allowlist of known safe commands, with LLM fallback for unknowns. The default for unknowns is "mutating" (require approval). Background trigger agents are restricted to read-only commands only.
+ADR 003 specifies: allowlist of known safe commands, with LLM fallback for unknowns. The default for unknowns is "mutating" (require approval).
+
+> **Note:** The trigger system (T-010) no longer uses command safety classification. Triggers use user-approved shell scripts — the user reviews and approves the script at creation time, so no automated safety classification is needed at poll time. See SPEC.md §6.2.
 
 This is critical-path safety logic with a 90%+ test coverage requirement (ADR 008).
 
@@ -41,9 +43,7 @@ This is critical-path safety logic with a 90%+ test coverage requirement (ADR 00
 
 4. **Classification API**: Expose a function `classifyCommand(command: string): Promise<{ safety: 'read_only' | 'mutating', reason: string, source: 'allowlist' | 'blocklist' | 'llm' }>`.
 
-5. **Trigger restriction**: The trigger system must ONLY execute commands classified as `read_only`. If a trigger needs a mutating command, it should fail with a clear error.
-
-6. **Chat approval flow**: For the chat interface, mutating commands are shown to the user with the command text and classification reason. The user can approve, modify, or reject.
+5. **Chat approval flow**: For the chat interface, mutating commands are shown to the user with the command text and classification reason. The user can approve, modify, or reject.
 
 ## Existing Code
 

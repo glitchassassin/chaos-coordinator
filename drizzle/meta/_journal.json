@@ -8,6 +8,13 @@
       "when": 1771028647777,
       "tag": "0000_polite_blazing_skull",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1771097032394,
+      "tag": "0001_faulty_luckman",
+      "breakpoints": true
     }
   ]
 }

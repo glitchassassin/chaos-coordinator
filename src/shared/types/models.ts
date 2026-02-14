@@ -49,12 +49,13 @@ export interface Trigger {
   id: number
   taskId: number
   nlCondition: string
-  interpretedCheck: string | null
+  checkScript: string | null
   status: TriggerStatus
   pollIntervalMs: number
   failureCount: number
   firedContext: string | null
   firedAt: string | null
+  lastError: string | null
   createdAt: string
   updatedAt: string
 }
@@ -62,7 +63,7 @@ export interface Trigger {
 export interface InsertTrigger {
   taskId: number
   nlCondition: string
-  interpretedCheck?: string | null
+  checkScript?: string | null
   status?: TriggerStatus
   pollIntervalMs?: number
 }

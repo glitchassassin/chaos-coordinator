@@ -8,9 +8,9 @@ export const triggers = sqliteTable('triggers', {
     .notNull()
     .references(() => tasks.id, { onDelete: 'cascade' }),
   nlCondition: text('nl_condition').notNull(),
-  interpretedCheck: text('interpreted_check'),
+  checkScript: text('check_script'),
   status: text('status', {
-    enum: ['pending', 'polling', 'fired', 'failed', 'cancelled']
+    enum: ['pending', 'awaiting_approval', 'polling', 'fired', 'failed', 'cancelled']
   })
     .notNull()
     .default('pending'),
@@ -18,6 +18,7 @@ export const triggers = sqliteTable('triggers', {
   failureCount: integer('failure_count').notNull().default(0),
   firedContext: text('fired_context'),
   firedAt: text('fired_at'),
+  lastError: text('last_error'),
   createdAt: text('created_at')
     .notNull()
     .default(sql`(datetime('now'))`),

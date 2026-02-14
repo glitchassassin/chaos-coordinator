@@ -42,7 +42,10 @@ export interface FocusResult {
 function isTaskActionable(taskId: number, triggersMap: Map<number, Trigger[]>): boolean {
   const taskTriggers = triggersMap.get(taskId) || []
   const hasWaitingTrigger = taskTriggers.some(
-    (t) => t.status === TriggerStatus.Pending || t.status === TriggerStatus.Polling
+    (t) =>
+      t.status === TriggerStatus.Pending ||
+      t.status === TriggerStatus.AwaitingApproval ||
+      t.status === TriggerStatus.Polling
   )
   return !hasWaitingTrigger
 }
@@ -118,7 +121,7 @@ function comparePriority(a: TaskWithPriorityData, b: TaskWithPriorityData): numb
  * Actionability rules:
  * - Task must not be archived
  * - Task must not be in backlog column
- * - Task must not have an active waiting trigger (pending or polling status)
+ * - Task must not have an active waiting trigger (pending, awaiting_approval, or polling status)
  *
  * @param db - Drizzle database instance
  * @returns FocusResult with the focus task (or null), its project and trigger, and queue depth

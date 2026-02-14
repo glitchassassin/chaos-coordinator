@@ -54,7 +54,15 @@ Evaluates the hardcoded priority rules (see SPEC.md §3) to determine the single
 
 ### Trigger Scheduler
 
-Manages in-process timers for polling trigger conditions. Handles backoff logic (5 min default, up to 60 min on failures). Fires events when triggers are met. Restricted to read-only CLI operations.
+Manages the full trigger lifecycle: generation → user approval → immediate test → polling → firing.
+
+1. **Generation:** When a trigger is created, the LLM generates a self-contained shell script from the natural language condition.
+2. **Approval:** The script is sent to the renderer for user review. The user can approve, edit, or reject.
+3. **Immediate test:** On approval, the script runs once. Exit 0 fires immediately; exit 1 starts polling; exit 2+ reports an error.
+4. **Polling:** In-process timers (`setTimeout`) run the script periodically. Default interval: 5 minutes, with backoff up to 60 minutes on errors (exit 2+).
+5. **Firing:** On exit 0, the trigger fires — stdout becomes `firedContext`, the task becomes actionable, and the priority engine re-evaluates.
+
+Only triggers in `polling` status are resumed on app boot. Triggers in `pending` or `awaiting_approval` status require user interaction and are not auto-resumed.
 
 ### CLI Runner
 
@@ -72,11 +80,11 @@ Single-window app with view switching (Focus, Board, Archive) and a persistent c
 
 1. **Task intake:** User pastes link → CLI Runner fetches metadata → LLM generates context → task created in SQLite
 2. **Priority evaluation:** Any state change → Priority Engine queries SQLite → Focus View updated via IPC
-3. **Trigger polling:** Trigger Scheduler fires timer → CLI Runner executes check → on match, task updated → priority re-evaluated
+3. **Trigger polling:** NL condition → LLM generates check script → user approves → immediate test → polling via shell execution → on exit 0, trigger fires → task updated → priority re-evaluated
 4. **Context capture:** User transitions task → LLM generates summary from current state + linked resource updates → stored in SQLite
 
 ## Key Boundaries
 
 - **Main ↔ Renderer:** All communication via Electron IPC. Renderer never accesses SQLite directly.
-- **CLI execution:** All external commands route through CLI Runner for safety classification.
+- **CLI execution:** Chat interface commands route through CLI Runner for safety classification. Trigger scripts bypass safety classification — they are user-approved at creation time (see SPEC.md §6.2).
 - **LLM calls:** All LLM interactions go through the Vercel AI SDK abstraction layer.
