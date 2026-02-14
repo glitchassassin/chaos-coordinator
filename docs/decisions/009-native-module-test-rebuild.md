@@ -13,10 +13,12 @@ This creates an ordering dependency: `build` then `test` breaks, but `test` then
 
 ### Automatic rebuilds via npm lifecycle scripts
 
-- **`pretest`**: `npm rebuild better-sqlite3` — recompiles for Node.js before Vitest runs.
-- **`pretest:e2e`**: `npx electron-rebuild -f -w better-sqlite3` — recompiles for Electron before Playwright E2E tests run.
+Every script that loads `better-sqlite3` gets a `pre` hook that rebuilds for the correct ABI:
 
-npm runs `pre<script>` hooks automatically, so `npm run test` and `npm run test:e2e` always work regardless of prior state.
+- **Node.js ABI** (Vitest): `pretest`, `pretest:watch`, `pretest:coverage` — all run `npm rebuild better-sqlite3`.
+- **Electron ABI** (Electron runtime): `predev`, `pretest:e2e` — both run `npx electron-rebuild -f -w better-sqlite3`.
+
+npm runs `pre<script>` hooks automatically, so any of these commands work regardless of prior state.
 
 ### Shared mock DB helper
 
