@@ -1,7 +1,7 @@
 ---
 id: T-002
 title: 'LLM Integration Setup'
-status: ready
+status: done
 priority: 1
 dependencies: []
 spec_refs: ['§10.3']

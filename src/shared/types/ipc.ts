@@ -10,6 +10,17 @@ export interface FocusResponse {
   }
 }
 
+export interface LLMGenerateRequest {
+  system?: string
+  prompt: string
+}
+
+export interface LLMGenerateStructuredRequest {
+  system?: string
+  prompt: string
+  schema: string // JSON stringified Zod schema
+}
+
 export interface IpcChannelMap {
   'projects:list': { request: undefined; response: Project[] }
   'projects:get': { request: { id: number }; response: Project | null }
@@ -32,6 +43,13 @@ export interface IpcChannelMap {
   }
   'tasks:archive': { request: { id: number }; response: Task }
   'tasks:focus': { request: undefined; response: FocusResponse }
+
+  'llm:generate': { request: LLMGenerateRequest; response: string }
+  'llm:generateStructured': {
+    request: LLMGenerateStructuredRequest
+    response: unknown
+  }
+  'llm:checkHealth': { request: undefined; response: { configured: boolean } }
 }
 
 export type IpcChannel = keyof IpcChannelMap
