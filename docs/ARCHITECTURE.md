@@ -39,7 +39,18 @@ Chaos Coordinator is an Electron desktop app with three major subsystems:
 
 ### Priority Engine
 
-Evaluates the hardcoded priority rules (see SPEC.md §3) to determine the single highest-priority actionable task. Runs on every state change (task update, trigger fire, user action).
+**Location:** `src/main/priority/engine.ts`
+
+Evaluates the hardcoded priority rules (see SPEC.md §3) to determine the single highest-priority actionable task. The engine implements a pure function `computeFocus(db)` that:
+
+1. Fetches all non-archived tasks with their associated projects and triggers
+2. Filters out non-actionable tasks (backlog column or tasks with pending/polling triggers)
+3. Sorts actionable tasks by priority rules (column position > trigger recency > project rank > last touched > time in queue)
+4. Returns the highest-priority task along with queue depth statistics
+
+**Invocation:** Called by the `tasks:focus` IPC handler whenever the renderer requests focus data. Currently triggered on-demand; future iterations will cache and invalidate on state changes.
+
+**Testing:** Unit tested with 100% coverage in `src/main/priority/__tests__/engine.test.ts`.
 
 ### Trigger Scheduler
 

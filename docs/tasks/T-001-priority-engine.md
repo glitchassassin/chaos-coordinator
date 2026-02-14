@@ -1,7 +1,7 @@
 ---
 id: T-001
 title: 'Implement Priority Engine'
-status: ready
+status: done
 priority: 1
 dependencies: []
 spec_refs: ['§3.1', '§3.2']

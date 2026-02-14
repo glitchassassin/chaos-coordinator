@@ -1,4 +1,14 @@
-import type { Project, InsertProject, Task, InsertTask } from './models'
+import type { Project, InsertProject, Task, InsertTask, Trigger } from './models'
+
+export interface FocusResponse {
+  task: Task | null
+  project: Project | null
+  trigger: Trigger | null
+  queueDepth: {
+    actionable: number
+    waiting: number
+  }
+}
 
 export interface IpcChannelMap {
   'projects:list': { request: undefined; response: Project[] }
@@ -21,7 +31,7 @@ export interface IpcChannelMap {
     response: Task
   }
   'tasks:archive': { request: { id: number }; response: Task }
-  'tasks:focus': { request: undefined; response: Task | null }
+  'tasks:focus': { request: undefined; response: FocusResponse }
 }
 
 export type IpcChannel = keyof IpcChannelMap

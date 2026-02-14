@@ -3,6 +3,7 @@ import { eq, and } from 'drizzle-orm'
 import { getDb } from '../db'
 import { tasks } from '../db/schema'
 import { Channels } from './channels'
+import { computeFocus } from '../priority'
 import type { InsertTask } from '../../shared/types'
 
 export function registerTaskHandlers(): void {
@@ -62,14 +63,6 @@ export function registerTaskHandlers(): void {
 
   ipcMain.handle(Channels.TasksFocus, () => {
     const db = getDb()
-    // Minimal focus logic — returns the first non-archived, non-backlog task
-    // Full priority engine will be implemented later per SPEC.md §3
-    const result = db
-      .select()
-      .from(tasks)
-      .where(eq(tasks.archived, false))
-      .orderBy(tasks.lastTouchedAt)
-      .get()
-    return result ?? null
+    return computeFocus(db)
   })
 }
