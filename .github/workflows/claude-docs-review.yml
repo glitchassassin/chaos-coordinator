@@ -1,0 +1,79 @@
+name: Claude Docs Review
+
+on:
+  schedule:
+    - cron: '0 9 * * *' # Daily at 9am UTC
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  check-activity:
+    runs-on: ubuntu-latest
+    outputs:
+      has_recent_commits: ${{ steps.check.outputs.has_recent_commits }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for commits in last 24 hours
+        id: check
+        run: |
+          COMMITS=$(git log --oneline --since="24 hours ago" | wc -l)
+          if [ "$COMMITS" -gt 0 ]; then
+            echo "has_recent_commits=true" >> "$GITHUB_OUTPUT"
+            echo "Found $COMMITS commit(s) in the last 24 hours"
+          else
+            echo "has_recent_commits=false" >> "$GITHUB_OUTPUT"
+            echo "No commits in the last 24 hours, skipping docs review"
+          fi
+
+  review-docs:
+    needs: check-activity
+    if: needs.check-activity.outputs.has_recent_commits == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Docs Review
+        id: claude-review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          model: claude-haiku-4-5-20251001
+          prompt: |
+            Run the review-docs ritual defined in rituals/review-docs.md.
+
+            Check all cross-references between docs, flag anything missing or stale,
+            and fix what you can.
+
+            If you find issues and make fixes:
+            1. Create a new branch named "docs/review-fixes-$(date +%Y%m%d)"
+            2. Commit the fixes
+            3. Create a PR with a summary of what was found and fixed
+            4. If anything is ambiguous or needs human judgment, note it in the PR description
+
+            If no issues are found, just report that docs are clean — do not create a PR.
+          allowed_tools: |
+            Bash(git checkout -b:*)
+            Bash(git add:*)
+            Bash(git commit:*)
+            Bash(git push:*)
+            Bash(gh pr create:*)
+            Bash(git diff:*)
+            Bash(git status:*)
+            Bash(ls:*)
+            Bash(grep:*)
+            Edit
+            Read
+            Glob
+            Grep
+            Write
