@@ -10,6 +10,7 @@ Chaos Coordinator is a single-user macOS Electron desktop app that manages devel
 - `docs/ARCHITECTURE.md` — System architecture and component boundaries
 - `docs/decisions/` — Technical decision log (ADRs); read before proposing alternatives to settled decisions
 - `docs/references/` — Standard patterns and solutions for recurring problems
+- `docs/tasks/` — Implementation task breakdown with frontmatter metadata (status, dependencies, spec refs). Read `docs/tasks/README.md` for the dependency graph and execution order. **When completing a task, update its `status` frontmatter** (draft → ready → in-progress → review → done).
 
 ## Tech Stack
 
