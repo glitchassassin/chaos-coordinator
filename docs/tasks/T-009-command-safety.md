@@ -20,7 +20,7 @@ The chat interface (T-011) executes CLI commands that must be classified as read
 
 ADR 003 specifies: allowlist of known safe commands, with LLM fallback for unknowns. The default for unknowns is "mutating" (require approval).
 
-> **Note:** The trigger system (T-010) no longer uses command safety classification. Triggers use user-approved shell scripts — the user reviews and approves the script at creation time, so no automated safety classification is needed at poll time. See SPEC.md §6.2.
+> **Note:** The trigger system (T-010) no longer uses command safety classification. Triggers use user-approved shell scripts — the user reviews and approves the script at creation time, so no automated safety classification is needed at poll time. See SPEC.md §6.2
 
 This is critical-path safety logic with a 90%+ test coverage requirement (ADR 008).
 
