@@ -17,6 +17,8 @@ This directory contains Architecture Decision Records (ADRs) documenting signifi
 | 007 | [Build Focus View layout iteratively](007-focus-view-layout.md)                | Accepted |
 | 008 | [Code quality and testing standards](008-code-quality-standards.md)            | Accepted |
 | 009 | [Automatic native module rebuild for tests](009-native-module-test-rebuild.md) | Accepted |
+| 010 | [OpenRouter as default LLM provider](010-openrouter-default-provider.md)       | Accepted |
+| 011 | [Schema-driven configuration system](011-configuration-system.md)              | Accepted |
 
 ## Format
 

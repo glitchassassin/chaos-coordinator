@@ -4,12 +4,13 @@
 
 Tasks are organized into phases based on dependencies. Within a phase, tasks can be worked in parallel unless noted.
 
-### Phase 1: Core Engine
+### Phase 1: Core Engine & Infrastructure
 
-| Task                              | Title                 | Complexity | Dependencies |
-| --------------------------------- | --------------------- | ---------- | ------------ |
-| [T-001](T-001-priority-engine.md) | Priority Engine       | M          | —            |
-| [T-002](T-002-llm-integration.md) | LLM Integration Setup | M          | —            |
+| Task                                   | Title                 | Complexity | Dependencies |
+| -------------------------------------- | --------------------- | ---------- | ------------ |
+| [T-001](T-001-priority-engine.md)      | Priority Engine       | M          | —            |
+| [T-002](T-002-llm-integration.md)      | LLM Integration Setup | M          | —            |
+| [T-013](T-013-configuration-system.md) | Configuration System  | L          | —            |
 
 ### Phase 2: Core Views
 
@@ -46,6 +47,7 @@ T-002 (LLM Integration) ──┬───────────────�
                            ├───────────────► T-009 (Command Safety) ──► T-011 (Chat Interface)
                            └───────────────► T-010 (Trigger System) ──► T-012 (Notifications)
 
+T-013 (Config System)      — independent; migrates T-002 config from env vars
 T-003 (Project Mgmt UI)   — independent, but enhances T-004, T-005
 T-005 (Board View)         — independent
 T-006 (Archive View)       — independent
