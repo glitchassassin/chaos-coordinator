@@ -1,0 +1,23 @@
+appId: com.chaos-coordinator.app
+productName: Chaos Coordinator
+directories:
+  buildResources: resources
+  output: dist
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!e2e/*'
+  - '!drizzle/*'
+  - '!{.eslintrc.cjs,.prettierrc,.editorconfig}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!{electron.vite.config.ts,vitest.config.ts,playwright.config.ts,drizzle.config.ts}'
+asarUnpack:
+  - resources/**
+  - node_modules/better-sqlite3/**
+mac:
+  target:
+    - dmg
+    - zip
+  category: public.app-category.developer-tools
+  entitlementsInherit: build/entitlements.mac.plist
+  artifactName: '${name}-${version}-${arch}.${ext}'

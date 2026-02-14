@@ -1,0 +1,5 @@
+out/
+dist/
+drizzle/
+node_modules/
+*.db

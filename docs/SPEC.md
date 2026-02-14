@@ -261,7 +261,7 @@ All application state is persisted locally on disk.
 
 ### 9.2 Storage Format
 
-Implementation detail to be determined. Candidates include SQLite or a structured JSON/YAML file. The key requirement is that the data is human-readable or easily inspectable for debugging, and that it supports the query patterns needed by the priority system (filtering by column, sorting by multiple criteria).
+SQLite via `better-sqlite3` with Drizzle ORM. The Drizzle schema files are the canonical data model reference — see ADR [004](decisions/004-sqlite-storage.md) for rationale.
 
 ---
 
@@ -314,14 +314,6 @@ A potential future enhancement: allow high-priority triggers to escalate to a mo
 
 ---
 
-## 12. Open Implementation Questions
+## 12. Implementation Decisions
 
-These decisions are deferred to the implementation phase:
-
-1. **Desktop framework:** Tauri (Rust + web frontend), Electron (JS), or native Swift. Trade-offs around development speed, performance, and native integration depth.
-2. **LLM provider and model:** Local model, Claude API, or configurable. Affects latency, cost, and offline capability.
-3. **Command safety classification:** Allowlist-based, LLM-based, or hybrid. Allowlists are more predictable; LLM-based handles novel commands better.
-4. **Storage engine:** SQLite vs. flat file. SQLite is better for complex queries; flat file is simpler and more portable.
-5. **Claude Code hook mechanism:** Whether to use Claude Code's native hook/event system (if available) or poll for session status.
-6. **Background agent architecture:** How the trigger polling agents are scheduled and managed (OS-level scheduling, in-process timers, etc.).
-7. **Focus View layout specifics:** Exact placement and sizing of the context block, links, and trigger info within the full-screen view. To be refined through prototyping.
+Implementation decisions are recorded as Architecture Decision Records (ADRs) in `docs/decisions/`. See the [decision log](decisions/README.md) for the full list.
