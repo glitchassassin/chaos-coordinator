@@ -14,45 +14,45 @@ describe('LLM Provider', () => {
   })
 
   describe('getConfig', () => {
-    it('reads API key from ANTHROPIC_API_KEY environment variable', () => {
-      process.env.ANTHROPIC_API_KEY = 'test-api-key'
+    it('reads API key from OPENROUTER_API_KEY environment variable', () => {
+      process.env.OPENROUTER_API_KEY = 'test-api-key'
 
       const config = getConfig()
 
-      expect(config.provider).toBe('anthropic')
+      expect(config.provider).toBe('openrouter')
       expect(config.apiKey).toBe('test-api-key')
     })
 
-    it('uses default model when ANTHROPIC_MODEL is not set', () => {
-      process.env.ANTHROPIC_API_KEY = 'test-api-key'
-      delete process.env.ANTHROPIC_MODEL
+    it('uses default model when OPENROUTER_MODEL is not set', () => {
+      process.env.OPENROUTER_API_KEY = 'test-api-key'
+      delete process.env.OPENROUTER_MODEL
 
       const config = getConfig()
 
-      expect(config.model).toBe('claude-sonnet-4-5-20250929')
+      expect(config.model).toBe('anthropic/claude-3.5-sonnet')
     })
 
-    it('uses custom model when ANTHROPIC_MODEL is set', () => {
-      process.env.ANTHROPIC_API_KEY = 'test-api-key'
-      process.env.ANTHROPIC_MODEL = 'claude-opus-4-6'
+    it('uses custom model when OPENROUTER_MODEL is set', () => {
+      process.env.OPENROUTER_API_KEY = 'test-api-key'
+      process.env.OPENROUTER_MODEL = 'openai/gpt-4'
 
       const config = getConfig()
 
-      expect(config.model).toBe('claude-opus-4-6')
+      expect(config.model).toBe('openai/gpt-4')
     })
 
     it('throws error when API key is not set', () => {
-      delete process.env.ANTHROPIC_API_KEY
+      delete process.env.OPENROUTER_API_KEY
 
       expect(() => getConfig()).toThrow(
-        'ANTHROPIC_API_KEY environment variable is not set. Please configure your API key.'
+        'OPENROUTER_API_KEY environment variable is not set. Please configure your API key.'
       )
     })
   })
 
   describe('createProvider', () => {
-    it('creates Anthropic provider when configured', () => {
-      process.env.ANTHROPIC_API_KEY = 'test-api-key'
+    it('creates OpenRouter provider when configured', () => {
+      process.env.OPENROUTER_API_KEY = 'test-api-key'
 
       const provider = createProvider()
 
@@ -62,9 +62,9 @@ describe('LLM Provider', () => {
     })
 
     it('throws error when API key is not configured', () => {
-      delete process.env.ANTHROPIC_API_KEY
+      delete process.env.OPENROUTER_API_KEY
 
-      expect(() => createProvider()).toThrow('ANTHROPIC_API_KEY')
+      expect(() => createProvider()).toThrow('OPENROUTER_API_KEY')
     })
   })
 })

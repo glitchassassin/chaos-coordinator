@@ -118,9 +118,9 @@ describe('LLM IPC Handlers', () => {
 
     it('returns configured:true when API key is set', async () => {
       vi.mocked(llmProvider.getConfig).mockReturnValue({
-        provider: 'anthropic',
+        provider: 'openrouter',
         apiKey: 'test-key',
-        model: 'claude-sonnet-4-5-20250929'
+        model: 'anthropic/claude-3.5-sonnet'
       })
 
       const handler = handlers.get('llm:checkHealth')

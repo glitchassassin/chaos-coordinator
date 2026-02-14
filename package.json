@@ -27,7 +27,7 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.44",
+    "@ai-sdk/openai": "^3.0.29",
     "@electron-toolkit/preload": "^3.0.1",
     "@electron-toolkit/utils": "^3.0.0",
     "ai": "^6.0.86",

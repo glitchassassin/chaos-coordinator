@@ -23,7 +23,7 @@ describe('LLM Service', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    process.env = { ...originalEnv, ANTHROPIC_API_KEY: 'test-api-key' }
+    process.env = { ...originalEnv, OPENROUTER_API_KEY: 'test-api-key' }
   })
 
   afterEach(() => {

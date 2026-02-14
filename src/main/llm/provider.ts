@@ -1,42 +1,45 @@
-import { createAnthropic } from '@ai-sdk/anthropic'
+import { createOpenAI } from '@ai-sdk/openai'
 import type { LanguageModel } from 'ai'
 
 export interface LLMConfig {
-  provider: 'anthropic' // Can extend to support more providers
+  provider: 'openrouter' // Can extend to support more providers
   apiKey: string
   model: string
 }
 
 /**
  * Get LLM configuration from environment variables.
- * Priority: process.env.ANTHROPIC_API_KEY
+ * Priority: process.env.OPENROUTER_API_KEY
  */
 export function getConfig(): LLMConfig {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.OPENROUTER_API_KEY
 
   if (!apiKey) {
     throw new Error(
-      'ANTHROPIC_API_KEY environment variable is not set. Please configure your API key.'
+      'OPENROUTER_API_KEY environment variable is not set. Please configure your API key.'
     )
   }
 
   return {
-    provider: 'anthropic',
+    provider: 'openrouter',
     apiKey,
-    model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5-20250929'
+    model: process.env.OPENROUTER_MODEL || 'anthropic/claude-3.5-sonnet'
   }
 }
 
 /**
  * Create and configure the LLM provider instance.
- * Uses Anthropic by default as per ADR 002.
+ * Uses OpenRouter by default as per ADR 010.
+ * OpenRouter provides access to multiple LLM providers through a unified API.
  */
 export function createProvider(): LanguageModel {
   const config = getConfig()
 
-  // Currently only Anthropic is supported
-  const client = createAnthropic({
-    apiKey: config.apiKey
+  // OpenRouter uses OpenAI-compatible API with custom base URL
+  const openrouter = createOpenAI({
+    apiKey: config.apiKey,
+    baseURL: 'https://openrouter.ai/api/v1'
   })
-  return client(config.model)
+
+  return openrouter(config.model)
 }
