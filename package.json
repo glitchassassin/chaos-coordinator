@@ -8,7 +8,7 @@
   "private": true,
   "scripts": {
     "predev": "npx electron-rebuild -f -w better-sqlite3",
-    "dev": "electron-vite dev",
+    "dev": "electron-vite dev -- --remote-debugging-port=9222",
     "build": "electron-vite build && electron-builder --mac",
     "pretest": "npm rebuild better-sqlite3",
     "test": "vitest run",
