@@ -37,7 +37,15 @@ export default defineConfig({
         'src/**/__tests__/**',
         'src/**/*.d.ts',
         'src/renderer/src/env.d.ts',
-        'src/renderer/src/main.tsx'
+        'src/renderer/src/main.tsx',
+        // Type-only files
+        'src/shared/types/**',
+        'src/shared/config/types.ts',
+        // Entry points (tested via E2E)
+        'src/main/index.ts',
+        'src/preload/index.ts',
+        // Simple re-export index files
+        'src/**/index.ts'
       ],
       thresholds: {
         lines: 80,

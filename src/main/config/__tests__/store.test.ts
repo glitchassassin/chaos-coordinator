@@ -33,7 +33,13 @@ describe('ConfigStore', () => {
     }
     configPath = join(testDir, 'config.json')
 
+    // Clean up any existing config file from previous tests
+    if (existsSync(configPath)) {
+      rmSync(configPath)
+    }
+
     // Reset mocks
+    vi.clearAllMocks()
     vi.mocked(safeStorage.isEncryptionAvailable).mockReturnValue(true)
 
     store = new ConfigStore(configPath)
