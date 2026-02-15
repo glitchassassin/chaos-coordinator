@@ -32,9 +32,11 @@ npm run lint         # Lint + typecheck
 
 ## Code Quality
 
-- **All standards are enforced by tooling** — lint, typecheck, and CI gates. See ADR [008](docs/decisions/008-code-quality-standards.md) for rationale.
-- Run `npm run lint` before committing. Pre-commit hooks enforce this automatically.
-- TypeScript `strict` mode is on. No `any` types without an ESLint disable comment explaining why.
-- **Coverage:** 80% line coverage overall. 90%+ on critical business logic (priority engine, trigger system, command safety).
+All standards are enforced by a 4-layer system. See ADR [008](docs/decisions/008-code-quality-standards.md) for rationale.
+
+- **Before committing:** Run `npm run lint` proactively. The pre-commit hook enforces lint-staged + project-wide typecheck as a backstop.
+- **Before pushing:** Run `npm run test` proactively. The pre-push hook enforces the full test suite with coverage thresholds as a backstop.
+- **CI (GitHub Actions):** Runs lint, typecheck, and tests on all PRs to `main`. This is the final gate and audit trail.
+- **Standards:** TypeScript `strict` mode is on. No `any` types without an ESLint disable comment explaining why. 80% line coverage overall; 90%+ on critical business logic (priority engine, trigger system, command safety).
 - Data model changes go through Drizzle schema files — those are the canonical schema reference.
 - When you encounter a recurring pattern or solution worth standardizing, check `docs/references/` for existing guidance and add new entries there.

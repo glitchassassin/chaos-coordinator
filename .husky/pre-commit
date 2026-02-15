@@ -1,1 +1,5 @@
 npx lint-staged
+
+# Typecheck entire project (tsc can't run on individual files)
+tsc --noEmit -p tsconfig.node.json
+tsc --noEmit -p tsconfig.web.json
