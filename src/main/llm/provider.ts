@@ -1,5 +1,6 @@
 import { createOpenAI } from '@ai-sdk/openai'
 import type { LanguageModel } from 'ai'
+import { configStore } from '../config'
 
 export interface LLMConfig {
   provider: 'openrouter' // Can extend to support more providers
@@ -8,22 +9,19 @@ export interface LLMConfig {
 }
 
 /**
- * Get LLM configuration from environment variables.
- * Priority: process.env.OPENROUTER_API_KEY
+ * Get LLM configuration from the config store.
  */
 export function getConfig(): LLMConfig {
-  const apiKey = process.env.OPENROUTER_API_KEY
+  const apiKey = configStore.get('llm.apiKey')
 
   if (!apiKey) {
-    throw new Error(
-      'OPENROUTER_API_KEY environment variable is not set. Please configure your API key.'
-    )
+    throw new Error('LLM API key is not configured. Please set it in Settings.')
   }
 
   return {
-    provider: 'openrouter',
+    provider: configStore.get('llm.provider'),
     apiKey,
-    model: process.env.OPENROUTER_MODEL || 'anthropic/claude-3.5-sonnet'
+    model: configStore.get('llm.model')
   }
 }
 
