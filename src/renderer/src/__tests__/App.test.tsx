@@ -1,49 +1,77 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import App from '../App'
 
+// Mock window.api
+const mockApi = {
+  invoke: vi.fn()
+}
+
 describe('App', () => {
-  it('renders the layout with navigation', () => {
+  beforeEach(() => {
+    // Set up window.api mock
+    Object.defineProperty(window, 'api', {
+      value: mockApi,
+      writable: true,
+      configurable: true
+    })
+
+    // Default: LLM is configured
+    mockApi.invoke.mockResolvedValue({ configured: true })
+  })
+
+  it('renders the layout with navigation', async () => {
     render(
       <MemoryRouter initialEntries={['/focus']}>
         <App />
       </MemoryRouter>
     )
 
-    expect(screen.getByText('Chaos Coordinator')).toBeInTheDocument()
+    // Wait for health check to complete
+    await waitFor(() => {
+      expect(screen.getByText('Chaos Coordinator')).toBeInTheDocument()
+    })
+
     expect(screen.getByText('Focus')).toBeInTheDocument()
     expect(screen.getByText('Board')).toBeInTheDocument()
     expect(screen.getByText('Archive')).toBeInTheDocument()
+    expect(screen.getByText('Settings')).toBeInTheDocument()
   })
 
-  it('shows Focus View by default', () => {
+  it('shows Focus View by default', async () => {
     render(
       <MemoryRouter initialEntries={['/focus']}>
         <App />
       </MemoryRouter>
     )
 
-    expect(screen.getByText('Focus View')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('Focus View')).toBeInTheDocument()
+    })
   })
 
-  it('navigates to Board View', () => {
+  it('navigates to Board View', async () => {
     render(
       <MemoryRouter initialEntries={['/board']}>
         <App />
       </MemoryRouter>
     )
 
-    expect(screen.getByText('Board View')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('Board View')).toBeInTheDocument()
+    })
   })
 
-  it('navigates to Archive View', () => {
+  it('navigates to Archive View', async () => {
     render(
       <MemoryRouter initialEntries={['/archive']}>
         <App />
       </MemoryRouter>
     )
 
-    expect(screen.getByText('Archive View')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('Archive View')).toBeInTheDocument()
+    })
   })
 })

@@ -3,6 +3,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc'
 import { runMigrations } from './db/migrate'
+import { configStore } from './config'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -42,6 +43,7 @@ void app.whenReady().then(() => {
   })
 
   runMigrations()
+  configStore.initialize()
   registerIpcHandlers()
   createWindow()
 

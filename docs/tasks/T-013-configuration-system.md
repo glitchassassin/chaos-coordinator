@@ -1,7 +1,7 @@
 ---
 id: T-013
 title: 'Configuration System'
-status: draft
+status: done
 priority: 1
 dependencies: []
 spec_refs: ['§9.1', '§10.3']
@@ -9,6 +9,7 @@ adrs: ['011']
 estimated_complexity: L
 tags: [core, infrastructure]
 created: 2026-02-14
+updated: 2026-02-14
 ---
 
 # T-013: Configuration System

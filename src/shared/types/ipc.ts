@@ -1,4 +1,10 @@
 import type { Project, InsertProject, Task, InsertTask, Trigger } from './models'
+import type {
+  ConfigKey,
+  ConfigValueMap,
+  MaskedConfig,
+  ConfigSchemaMetadata
+} from '../config/types'
 
 export interface FocusResponse {
   task: Task | null
@@ -50,6 +56,18 @@ export interface IpcChannelMap {
     response: unknown
   }
   'llm:checkHealth': { request: undefined; response: { configured: boolean } }
+
+  'config:get': {
+    request: { key: ConfigKey }
+    response: ConfigValueMap[ConfigKey] | undefined
+  }
+  'config:set': {
+    request: { key: ConfigKey; value: ConfigValueMap[ConfigKey] }
+    response: boolean
+  }
+  'config:getAll': { request: undefined; response: MaskedConfig }
+  'config:getSchema': { request: undefined; response: ConfigSchemaMetadata }
+  'config:reset': { request: { key: ConfigKey }; response: boolean }
 }
 
 export type IpcChannel = keyof IpcChannelMap

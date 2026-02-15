@@ -3,7 +3,8 @@ import { NavLink, Outlet } from 'react-router-dom'
 const navItems = [
   { to: '/focus', label: 'Focus' },
   { to: '/board', label: 'Board' },
-  { to: '/archive', label: 'Archive' }
+  { to: '/archive', label: 'Archive' },
+  { to: '/settings', label: 'Settings' }
 ] as const
 
 export default function Layout() {
