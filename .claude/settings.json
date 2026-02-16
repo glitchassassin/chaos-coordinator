@@ -75,6 +75,11 @@
             "type": "agent",
             "prompt": "Verify that npm run lint and npm test pass. $ARGUMENTS",
             "timeout": 120
+          },
+          {
+            "type": "agent",
+            "prompt": "If changes have been made and the task is complete, check if code-reviewer subagent has been invoked. If not, run it.",
+            "timeout": 600
           }
         ]
       }
