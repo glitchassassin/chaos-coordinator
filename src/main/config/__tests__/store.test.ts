@@ -10,7 +10,7 @@ import { safeStorage } from 'electron'
 // Mock Electron modules
 vi.mock('electron', () => ({
   app: {
-    getPath: vi.fn(() => join(tmpdir(), 'chaos-coordinator-test')),
+    getPath: vi.fn(() => join(tmpdir(), 'chaos-coordinator-test-config-store')),
     isReady: vi.fn(() => true),
     whenReady: vi.fn(() => Promise.resolve())
   },
@@ -27,7 +27,7 @@ describe('ConfigStore', () => {
 
   beforeEach(() => {
     // Create a temporary directory for test config
-    const testDir = join(tmpdir(), 'chaos-coordinator-test')
+    const testDir = join(tmpdir(), 'chaos-coordinator-test-config-store')
     if (!existsSync(testDir)) {
       mkdirSync(testDir, { recursive: true })
     }
