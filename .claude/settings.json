@@ -1,0 +1,83 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:electron-vite.org)",
+      "Bash(npx tsc:*)",
+      "Bash(npx eslint:*)",
+      "Bash(npx vitest run:*)",
+      "Bash(npm rebuild:*)",
+      "Bash(npx husky init:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run test:*)",
+      "Bash(npx electron-vite build:*)",
+      "Bash(npm run db:generate:*)",
+      "Bash(git -C /Users/jon/repos/chaos-coordinator diff --staged)",
+      "Bash(git -C /Users/jon/repos/chaos-coordinator log --oneline -5)",
+      "Bash(git -C /Users/jon/repos/chaos-coordinator diff docs/SPEC.md)",
+      "Bash(git -C /Users/jon/repos/chaos-coordinator add .gitignore .husky/ .prettierignore CLAUDE.md docs/ drizzle.config.ts drizzle/ e2e/ electron-builder.yml electron.vite.config.ts eslint.config.mjs package-lock.json package.json playwright.config.ts prettier.config.mjs resources/ src/ tsconfig.json tsconfig.node.json tsconfig.web.json vitest.config.ts)",
+      "Bash(git -C:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run test:e2e:*)",
+      "Bash(npm install:*)",
+      "Bash(npx playwright test:*)",
+      "Bash(npx electron:*)",
+      "Bash(npx electron-rebuild:*)",
+      "Bash(npm run dev:*)",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_close",
+      "mcp__playwright__browser_wait_for",
+      "mcp__playwright__browser_navigate",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(npm run test:coverage:*)",
+      "Bash(npm uninstall:*)",
+      "WebFetch(domain:www.electronjs.org)",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Bash(npm test:*)",
+      "Bash(npm run test:fast:*)",
+      "Bash(npm run format:*)",
+      "Bash(git checkout:*)",
+      "Bash(find:*)",
+      "mcp__playwright__browser_hover",
+      "mcp__playwright__browser_console_messages",
+      "Bash(git status:*)",
+      "Bash(bash -n:*)",
+      "mcp__playwright__browser_run_code",
+      "mcp__playwright__browser_type",
+      "mcp__playwright__browser_press_key",
+      "mcp__playwright__browser_network_requests",
+      "mcp__playwright__browser_evaluate"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": ["playwright"],
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path' | xargs npx prettier --write"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "agent",
+            "prompt": "Verify that npm run lint and npm test pass. $ARGUMENTS",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  }
+}
