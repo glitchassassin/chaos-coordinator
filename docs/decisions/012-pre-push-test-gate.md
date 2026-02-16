@@ -1,7 +1,8 @@
 # ADR 012: Pre-Push Test Gate for Local Agent Feedback
 
-**Status:** Accepted
+**Status:** Superseded by Claude Code stop hooks
 **Date:** 2026-02-14
+**Superseded:** 2026-02-16
 
 ## Context
 
@@ -40,3 +41,14 @@ Running the full test suite on every commit would add ~10-15s to each commit. Du
 - **Push takes ~5-15s longer** due to the test run. Acceptable given the correctness benefit and that pushes are less frequent than commits.
 - **Hook bypass is still possible** (`--no-verify`), but CI catches it. The hook is a fast feedback loop, not a security boundary.
 - **CI remains the authoritative gate** — the pre-push hook is a convenience layer that gives agents the same signal CI would, just sooner.
+
+## Why Superseded
+
+**Claude Code stop hooks** now provide test and lint feedback directly within the agent session. When stopping a task (exit or `Ctrl+C`), Claude Code runs the configured validation commands and shows results in context. This is superior to pre-push hooks because:
+
+1. **Earlier feedback** — validation runs when stopping work, not just before pushing
+2. **Better UX** — results appear in the agent's conversation, not just as hook output
+3. **No push delay** — the ~5-15s test run no longer blocks git push
+4. **Same guarantees** — CI still provides the authoritative gate
+
+The pre-push hook was removed on 2026-02-16.
