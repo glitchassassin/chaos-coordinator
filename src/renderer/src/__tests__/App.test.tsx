@@ -59,7 +59,7 @@ describe('App', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('Board View')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Board' })).toBeInTheDocument()
     })
   })
 

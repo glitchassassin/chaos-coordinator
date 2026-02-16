@@ -1,7 +1,7 @@
 ---
 id: T-005
 title: 'Board View'
-status: ready
+status: in-progress
 priority: 2
 dependencies: []
 spec_refs: ['§2.2']
@@ -9,7 +9,7 @@ adrs: []
 estimated_complexity: L
 tags: [ui, core]
 created: 2026-02-14
-updated: 2026-02-14
+updated: 2026-02-16
 ---
 
 # T-005: Board View
