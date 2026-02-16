@@ -19,6 +19,8 @@ This directory contains Architecture Decision Records (ADRs) documenting signifi
 | 009 | [Automatic native module rebuild for tests](009-native-module-test-rebuild.md) | Accepted   |
 | 010 | [OpenRouter as default LLM provider](010-openrouter-default-provider.md)       | Accepted   |
 | 011 | [Schema-driven configuration system](011-configuration-system.md)              | Accepted   |
+| 012 | [Pre-push test gate for agent feedback](012-pre-push-test-gate.md)             | Accepted   |
+| 013 | [Automated task pipeline via Claude Code CLI](013-auto-task-pipeline.md)       | Accepted   |
 
 ## Format
 
