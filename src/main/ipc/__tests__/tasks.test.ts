@@ -404,6 +404,7 @@ describe('Tasks IPC Handlers', () => {
           updatedAt: '2024-01-01'
         },
         trigger: null,
+        links: [],
         queueDepth: {
           actionable: 5,
           waiting: 2

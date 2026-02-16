@@ -1,4 +1,4 @@
-import type { Project, InsertProject, Task, InsertTask, Trigger } from './models'
+import type { Project, InsertProject, Task, InsertTask, Trigger, Link } from './models'
 import type {
   ConfigKey,
   ConfigValueMap,
@@ -10,6 +10,7 @@ export interface FocusResponse {
   task: Task | null
   project: Project | null
   trigger: Trigger | null
+  links: Link[]
   queueDepth: {
     actionable: number
     waiting: number

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createMockDb } from '../../__tests__/helpers/mock-db'
 import { computeFocus } from '../engine'
-import { projects, tasks, triggers } from '../../db/schema'
+import { projects, tasks, triggers, links } from '../../db/schema'
 import { TaskColumn, TriggerStatus } from '../../../shared/types/enums'
 import type { AppDatabase } from '../../db'
 
@@ -794,6 +794,144 @@ describe('Priority Engine', () => {
 
         // Queue depth: 3 actionable (A1, B1, B2), 1 waiting (A2)
         expect(result.queueDepth).toEqual({ actionable: 3, waiting: 1 })
+      })
+    })
+
+    describe('links', () => {
+      it('returns links for the focused task', () => {
+        const project = db
+          .insert(projects)
+          .values({ name: 'Test Project', priorityRank: 0 })
+          .returning()
+          .get()
+
+        const task = db
+          .insert(tasks)
+          .values({
+            title: 'Task with links',
+            projectId: project.id,
+            column: TaskColumn.Planning
+          })
+          .returning()
+          .get()
+
+        const link1 = db
+          .insert(links)
+          .values({
+            taskId: task.id,
+            url: 'https://github.com/user/repo/issues/123',
+            label: 'Issue #123',
+            sourceType: 'github_issue',
+            isPrimary: true
+          })
+          .returning()
+          .get()
+
+        const link2 = db
+          .insert(links)
+          .values({
+            taskId: task.id,
+            url: 'https://example.com',
+            label: 'Example',
+            sourceType: 'other',
+            isPrimary: false
+          })
+          .returning()
+          .get()
+
+        const result = computeFocus(db)
+
+        expect(result.task?.id).toBe(task.id)
+        expect(result.links).toHaveLength(2)
+        expect(result.links).toContainEqual(link1)
+        expect(result.links).toContainEqual(link2)
+      })
+
+      it('returns empty links array when task has no links', () => {
+        const project = db
+          .insert(projects)
+          .values({ name: 'Test Project', priorityRank: 0 })
+          .returning()
+          .get()
+
+        const task = db
+          .insert(tasks)
+          .values({
+            title: 'Task without links',
+            projectId: project.id,
+            column: TaskColumn.Planning
+          })
+          .returning()
+          .get()
+
+        const result = computeFocus(db)
+
+        expect(result.task?.id).toBe(task.id)
+        expect(result.links).toEqual([])
+      })
+
+      it('returns empty links array when no task is focused', () => {
+        const result = computeFocus(db)
+
+        expect(result.task).toBeNull()
+        expect(result.links).toEqual([])
+      })
+
+      it('returns only links for the focused task, not other tasks', () => {
+        const project = db
+          .insert(projects)
+          .values({ name: 'Test Project', priorityRank: 0 })
+          .returning()
+          .get()
+
+        const task1 = db
+          .insert(tasks)
+          .values({
+            title: 'Higher priority task',
+            projectId: project.id,
+            column: TaskColumn.Review,
+            lastTouchedAt: '2024-01-02'
+          })
+          .returning()
+          .get()
+
+        const task2 = db
+          .insert(tasks)
+          .values({
+            title: 'Lower priority task',
+            projectId: project.id,
+            column: TaskColumn.Planning,
+            lastTouchedAt: '2024-01-01'
+          })
+          .returning()
+          .get()
+
+        const link1 = db
+          .insert(links)
+          .values({
+            taskId: task1.id,
+            url: 'https://task1.com',
+            label: 'Task 1 link'
+          })
+          .returning()
+          .get()
+
+        // Create link for task2 (should not be returned)
+        db.insert(links)
+          .values({
+            taskId: task2.id,
+            url: 'https://task2.com',
+            label: 'Task 2 link'
+          })
+          .run()
+
+        const result = computeFocus(db)
+
+        // Should focus on task1 (higher priority)
+        expect(result.task?.id).toBe(task1.id)
+        // Should only return links for task1
+        expect(result.links).toHaveLength(1)
+        expect(result.links[0]).toEqual(link1)
       })
     })
   })

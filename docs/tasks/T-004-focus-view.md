@@ -1,7 +1,7 @@
 ---
 id: T-004
 title: 'Focus View'
-status: ready
+status: done
 priority: 2
 dependencies: ['T-001']
 spec_refs: ['§2.1']
@@ -9,7 +9,8 @@ adrs: ['007']
 estimated_complexity: L
 tags: [ui, core]
 created: 2026-02-14
-updated: 2026-02-14
+updated: 2026-02-16
+completed: 2026-02-16
 ---
 
 # T-004: Focus View
@@ -35,7 +36,11 @@ ADR 007 says to build this iteratively — start functional, refine the visual t
 
 4. **Actions**:
    - **Complete phase / move to next column**: Advances the task to the next column (planning → in_progress → review → archived). On click, the task moves forward and the next highest-priority task appears. (Context capture on transition is handled by T-008 — for now, just move the task.)
-   - **Defer**: Push this task down in priority; show the next task instead. Does not change the task's column. Implementation: set a "deferred until" timestamp or simply move it to the back of the queue temporarily.
+   - **Defer**: Temporarily hide this task and show the next task instead. Does not change the task's column. Deferred tasks are:
+     - Stored in session-only state (persists across tab switches but not app restarts)
+     - Hidden from focus for 30 minutes from the time of deferral
+     - Resurfaced after 30 minutes OR if there are no other non-deferred actionable tasks in the queue
+     - Tracked with `{ taskId: number, deferredAt: Date }[]` in component state
    - **Switch to Board View**: Navigate to `/board`.
    - **Open Chat**: Navigate to or open the chat interface (placeholder until T-011).
 

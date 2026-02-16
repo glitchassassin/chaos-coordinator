@@ -40,14 +40,32 @@ describe('App', () => {
   })
 
   it('shows Focus View by default', async () => {
+    // Mock empty focus response
+    mockApi.invoke.mockImplementation((channel) => {
+      if (channel === 'llm:checkHealth') {
+        return Promise.resolve({ configured: true })
+      }
+      if (channel === 'tasks:focus') {
+        return Promise.resolve({
+          task: null,
+          project: null,
+          trigger: null,
+          links: [],
+          queueDepth: { actionable: 0, waiting: 0 }
+        })
+      }
+      return Promise.resolve(null)
+    })
+
     render(
       <MemoryRouter initialEntries={['/focus']}>
         <App />
       </MemoryRouter>
     )
 
+    // Focus View now shows "All clear" when there are no tasks
     await waitFor(() => {
-      expect(screen.getByText('Focus View')).toBeInTheDocument()
+      expect(screen.getByText('All clear')).toBeInTheDocument()
     })
   })
 

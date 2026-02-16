@@ -1,8 +1,8 @@
 import { eq, inArray } from 'drizzle-orm'
 import type { AppDatabase } from '../db'
-import { tasks, projects, triggers } from '../db/schema'
+import { tasks, projects, triggers, links } from '../db/schema'
 import { TaskColumn, TriggerStatus } from '../../shared/types/enums'
-import type { Task, Project, Trigger } from '../../shared/types/models'
+import type { Task, Project, Trigger, Link } from '../../shared/types/models'
 
 /**
  * Column priority weights (higher number = higher priority)
@@ -29,6 +29,7 @@ export interface FocusResult {
   task: Task | null
   project: Project | null
   trigger: Trigger | null
+  links: Link[]
   queueDepth: {
     actionable: number
     waiting: number
@@ -179,12 +180,19 @@ export function computeFocus(db: AppDatabase): FocusResult {
   actionableTasks.sort(comparePriority)
   const topTask = actionableTasks[0] || null
 
+  // Fetch links for the focused task
+  const taskLinks =
+    topTask !== null
+      ? db.select().from(links).where(eq(links.taskId, topTask.id)).all()
+      : []
+
   return {
     task: topTask
       ? ({ ...topTask, project: undefined, mostRecentFiredTrigger: undefined } as Task)
       : null,
     project: topTask?.project || null,
     trigger: topTask?.mostRecentFiredTrigger || null,
+    links: taskLinks,
     queueDepth: {
       actionable: actionableTasks.length,
       waiting: waitingCount
