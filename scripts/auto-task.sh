@@ -16,9 +16,6 @@ DEFAULT_MODEL="sonnet"
 DEFAULT_REVIEW_MODEL="opus"
 DEFAULT_MAX_FIX=3
 DEFAULT_MAX_REVIEW=2
-DEFAULT_IMPLEMENT_TURNS=50
-DEFAULT_FIX_TURNS=30
-DEFAULT_REVIEW_TURNS=40
 DEFAULT_LOG_DIR="$PROJECT_ROOT/logs"
 
 # ---- Configuration (env var fallbacks, then defaults) ----
@@ -27,9 +24,6 @@ MODEL="${AUTO_TASK_MODEL:-$DEFAULT_MODEL}"
 REVIEW_MODEL="${AUTO_TASK_REVIEW_MODEL:-$DEFAULT_REVIEW_MODEL}"
 MAX_FIX="${AUTO_TASK_MAX_FIX:-$DEFAULT_MAX_FIX}"
 MAX_REVIEW="${AUTO_TASK_MAX_REVIEW:-$DEFAULT_MAX_REVIEW}"
-IMPLEMENT_TURNS="$DEFAULT_IMPLEMENT_TURNS"
-FIX_TURNS="$DEFAULT_FIX_TURNS"
-REVIEW_TURNS="$DEFAULT_REVIEW_TURNS"
 LOG_DIR="$DEFAULT_LOG_DIR"
 TASK=""
 VERBOSE=false
@@ -50,9 +44,6 @@ Options:
   --review-model MODEL  Model for review phase (default: $DEFAULT_REVIEW_MODEL)
   --max-fix N           Max validation fix attempts per phase (default: $DEFAULT_MAX_FIX)
   --max-review N        Max review rounds (default: $DEFAULT_MAX_REVIEW)
-  --implement-turns N   Max turns for implement phase (default: $DEFAULT_IMPLEMENT_TURNS)
-  --fix-turns N         Max turns for fix phase (default: $DEFAULT_FIX_TURNS)
-  --review-turns N      Max turns for review phase (default: $DEFAULT_REVIEW_TURNS)
   --log-dir DIR         Log directory (default: $DEFAULT_LOG_DIR)
   -v, --verbose         Show full Claude output (default: last 30 lines)
   -h, --help            Show this help message
@@ -85,12 +76,6 @@ while [[ $# -gt 0 ]]; do
       MAX_FIX="$2"; shift 2 ;;
     --max-review)
       MAX_REVIEW="$2"; shift 2 ;;
-    --implement-turns)
-      IMPLEMENT_TURNS="$2"; shift 2 ;;
-    --fix-turns)
-      FIX_TURNS="$2"; shift 2 ;;
-    --review-turns)
-      REVIEW_TURNS="$2"; shift 2 ;;
     --log-dir)
       LOG_DIR="$2"; shift 2 ;;
     -v|--verbose)
@@ -122,13 +107,19 @@ log() {
 # ---- Temp File Cleanup ----
 
 TEMP_FILES=()
+CLAUDE_PID=""
 
 cleanup() {
+  if [[ -n "$CLAUDE_PID" ]] && kill -0 "$CLAUDE_PID" 2>/dev/null; then
+    kill -TERM "$CLAUDE_PID" 2>/dev/null
+    wait "$CLAUDE_PID" 2>/dev/null || true
+  fi
   for f in "${TEMP_FILES[@]}"; do
     rm -f "$f"
   done
 }
 trap cleanup EXIT
+trap 'log "Interrupted."; exit 130' INT TERM
 
 make_temp() {
   local tmp
@@ -190,12 +181,15 @@ run_claude() {
   log "--- Phase: $phase ---"
   log "Running: claude $*"
 
-  if claude "$@" > "$tmp_out" 2>&1; then
+  claude "$@" > "$tmp_out" 2>&1 &
+  CLAUDE_PID=$!
+  if wait "$CLAUDE_PID"; then
     log "Phase '$phase' completed successfully."
   else
     local exit_code=$?
     log "Phase '$phase' exited with code $exit_code."
   fi
+  CLAUDE_PID=""
 
   # Append to log
   {
@@ -290,7 +284,6 @@ validate_and_fix() {
     run_claude "FIX (attempt $attempt)" \
       -p "$FIX_PROMPT" \
       --model "$MODEL" \
-      --max-turns "$FIX_TURNS" \
       --dangerously-skip-permissions \
       --output-format text \
       < "$errors_file"
@@ -393,7 +386,6 @@ main() {
   run_claude "IMPLEMENT" \
     -p "$IMPLEMENT_PROMPT" \
     --model "$MODEL" \
-    --max-turns "$IMPLEMENT_TURNS" \
     --dangerously-skip-permissions \
     --output-format text
 
@@ -436,7 +428,6 @@ main() {
     run_claude "REVIEW (round $round)" \
       -p "$REVIEW_PROMPT" \
       --model "$REVIEW_MODEL" \
-      --max-turns "$REVIEW_TURNS" \
       --dangerously-skip-permissions \
       --output-format text
 
