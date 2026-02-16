@@ -11,9 +11,9 @@ export const tasks = sqliteTable('tasks', {
   })
     .notNull()
     .default('planning'),
-  projectId: integer('project_id')
-    .notNull()
-    .references(() => projects.id, { onDelete: 'cascade' }),
+  projectId: integer('project_id').references(() => projects.id, {
+    onDelete: 'set null'
+  }),
   archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
   lastTouchedAt: text('last_touched_at')
     .notNull()

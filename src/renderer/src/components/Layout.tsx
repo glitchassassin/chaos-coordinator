@@ -4,6 +4,7 @@ const navItems = [
   { to: '/focus', label: 'Focus' },
   { to: '/board', label: 'Board' },
   { to: '/archive', label: 'Archive' },
+  { to: '/projects', label: 'Projects' },
   { to: '/settings', label: 'Settings' }
 ] as const
 

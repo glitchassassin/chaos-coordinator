@@ -30,7 +30,7 @@ export interface Task {
   title: string
   contextBlock: string | null
   column: TaskColumn
-  projectId: number
+  projectId: number | null
   archived: boolean
   lastTouchedAt: string
   createdAt: string
@@ -39,7 +39,7 @@ export interface Task {
 
 export interface InsertTask {
   title: string
-  projectId: number
+  projectId?: number | null
   contextBlock?: string | null
   column?: TaskColumn
   archived?: boolean

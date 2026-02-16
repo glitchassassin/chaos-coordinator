@@ -15,11 +15,20 @@ export default defineConfig({
         test: {
           name: 'node',
           environment: 'node',
-          include: ['src/main/**/__tests__/**/*.test.ts'],
+          include: [
+            'src/main/**/__tests__/**/*.test.ts',
+            'src/shared/**/__tests__/**/*.test.ts'
+          ],
           globals: true
         }
       },
       {
+        resolve: {
+          alias: {
+            '@shared': resolve(__dirname, 'src/shared'),
+            '@renderer': resolve(__dirname, 'src/renderer/src')
+          }
+        },
         test: {
           name: 'renderer',
           environment: 'jsdom',

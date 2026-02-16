@@ -4,6 +4,7 @@ import Layout from './components/Layout'
 import FocusView from './views/FocusView'
 import BoardView from './views/BoardView'
 import ArchiveView from './views/ArchiveView'
+import ProjectsView from './views/ProjectsView'
 import SettingsView from './views/SettingsView'
 
 export default function App() {
@@ -44,6 +45,7 @@ export default function App() {
         <Route path="/focus" element={<FocusView />} />
         <Route path="/board" element={<BoardView />} />
         <Route path="/archive" element={<ArchiveView />} />
+        <Route path="/projects" element={<ProjectsView />} />
         <Route path="/settings" element={<SettingsView />} />
       </Route>
     </Routes>

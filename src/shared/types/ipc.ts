@@ -68,6 +68,16 @@ export interface IpcChannelMap {
   'config:getAll': { request: undefined; response: MaskedConfig }
   'config:getSchema': { request: undefined; response: ConfigSchemaMetadata }
   'config:reset': { request: { key: ConfigKey }; response: boolean }
+
+  'dialog:open-image': { request: undefined; response: string | null }
+  'files:copy-to-app-data': {
+    request: { sourcePath: string }
+    response: string
+  }
+  'colors:extract-palette': {
+    request: { imagePath: string }
+    response: { colors: string[] }
+  }
 }
 
 export type IpcChannel = keyof IpcChannelMap

@@ -15,6 +15,13 @@
       "when": 1771097032394,
       "tag": "0001_faulty_luckman",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1771186218014,
+      "tag": "0002_classy_mantis",
+      "breakpoints": true
     }
   ]
 }

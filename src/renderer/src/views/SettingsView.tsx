@@ -5,6 +5,8 @@ import type {
   MaskedConfig,
   ConfigKeyMeta
 } from '../../../shared/config/types'
+import ToastNotification from '../components/Toast'
+import { useToast } from '../hooks/useToast'
 
 interface SettingsViewProps {
   firstRun?: boolean
@@ -14,14 +16,7 @@ export default function SettingsView({ firstRun = false }: SettingsViewProps) {
   const [schema, setSchema] = useState<ConfigSchemaMetadata | null>(null)
   const [values, setValues] = useState<MaskedConfig>({})
   const [errors, setErrors] = useState<Partial<Record<ConfigKey, string>>>({})
-  const [toast, setToast] = useState<string | null>(null)
-
-  const showToast = useCallback((message: string) => {
-    setToast(message)
-    setTimeout(() => {
-      setToast(null)
-    }, 2000)
-  }, [])
+  const { toast, showToast } = useToast(2000)
 
   const loadSettings = useCallback(async () => {
     try {
@@ -124,11 +119,7 @@ export default function SettingsView({ firstRun = false }: SettingsViewProps) {
         ))}
       </div>
 
-      {toast && (
-        <div className="fixed right-6 bottom-6 rounded-md border border-green-700 bg-green-900/90 px-4 py-2 text-sm text-green-200 shadow-lg">
-          {toast}
-        </div>
-      )}
+      <ToastNotification toast={toast} />
     </div>
   )
 }

@@ -22,7 +22,10 @@ const mockDb = {
   select: vi.fn(),
   insert: vi.fn(),
   update: vi.fn(),
-  delete: vi.fn()
+  delete: vi.fn(),
+  transaction: vi.fn((fn: (tx: typeof mockDb) => void) => {
+    fn(mockDb)
+  })
 }
 
 vi.mock('../../db', () => ({
@@ -39,7 +42,8 @@ describe('Projects IPC Handlers', () => {
         where: vi.fn().mockReturnValue({
           get: vi.fn()
         }),
-        all: vi.fn()
+        all: vi.fn(),
+        get: vi.fn().mockReturnValue({ max: -1 })
       })
     })
 
@@ -54,6 +58,7 @@ describe('Projects IPC Handlers', () => {
     mockDb.update.mockReturnValue({
       set: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
+          run: vi.fn(),
           returning: vi.fn().mockReturnValue({
             get: vi.fn()
           })
@@ -220,6 +225,36 @@ describe('Projects IPC Handlers', () => {
       expect(result).toEqual(createdProject)
       expect(mockDb.insert).toHaveBeenCalled()
     })
+
+    it('auto-assigns priorityRank as max + 1', () => {
+      registerProjectHandlers()
+
+      const getMock = vi.fn().mockReturnValue({ max: 2 })
+      mockDb.select.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          get: getMock,
+          all: vi.fn()
+        })
+      })
+
+      const insertValues = vi.fn().mockReturnValue({
+        returning: vi.fn().mockReturnValue({
+          get: vi.fn().mockReturnValue({ id: 1, name: 'New', priorityRank: 3 })
+        })
+      })
+      mockDb.insert.mockReturnValue({
+        values: insertValues
+      })
+
+      const calls = vi.mocked(ipcMain.handle).mock.calls
+      const handler = calls.find((call) => call[0] === Channels.ProjectsCreate)?.[1]
+
+      handler?.({} as Electron.IpcMainInvokeEvent, { name: 'New' })
+
+      expect(insertValues).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'New', priorityRank: 3 })
+      )
+    })
   })
 
   describe('projects:update', () => {
@@ -263,23 +298,52 @@ describe('Projects IPC Handlers', () => {
   })
 
   describe('projects:delete', () => {
-    it('deletes a project', () => {
+    it('deletes tasks then deletes the project', () => {
       registerProjectHandlers()
 
-      const runMock = vi.fn()
-      mockDb.delete.mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          run: runMock
+      const deleteTasksRunMock = vi.fn()
+      const deleteProjectRunMock = vi.fn()
+
+      // First call deletes tasks, second call deletes project
+      mockDb.delete
+        .mockReturnValueOnce({
+          where: vi.fn().mockReturnValue({
+            run: deleteTasksRunMock
+          })
         })
-      })
+        .mockReturnValueOnce({
+          where: vi.fn().mockReturnValue({
+            run: deleteProjectRunMock
+          })
+        })
 
       const calls = vi.mocked(ipcMain.handle).mock.calls
       const handler = calls.find((call) => call[0] === Channels.ProjectsDelete)?.[1]
 
       handler?.({} as Electron.IpcMainInvokeEvent, { id: 1 })
 
-      expect(mockDb.delete).toHaveBeenCalled()
-      expect(runMock).toHaveBeenCalled()
+      expect(mockDb.delete).toHaveBeenCalledTimes(2)
+      expect(deleteTasksRunMock).toHaveBeenCalled()
+      expect(deleteProjectRunMock).toHaveBeenCalled()
+    })
+
+    it('handles deletion of nonexistent project without error', () => {
+      registerProjectHandlers()
+
+      const deleteRunMock = vi.fn()
+      mockDb.delete.mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          run: deleteRunMock
+        })
+      })
+
+      const calls = vi.mocked(ipcMain.handle).mock.calls
+      const handler = calls.find((call) => call[0] === Channels.ProjectsDelete)?.[1]
+
+      // Should not throw even if no rows are affected
+      expect(() => {
+        handler?.({} as Electron.IpcMainInvokeEvent, { id: 999 })
+      }).not.toThrow()
     })
   })
 })

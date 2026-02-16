@@ -40,3 +40,12 @@ All standards are enforced by a 4-layer system. See ADR [008](docs/decisions/008
 - **Standards:** TypeScript `strict` mode is on. No `any` types without an ESLint disable comment explaining why. 80% line coverage overall; 90%+ on critical business logic (priority engine, trigger system, command safety).
 - Data model changes go through Drizzle schema files — those are the canonical schema reference.
 - When you encounter a recurring pattern or solution worth standardizing, check `docs/references/` for existing guidance and add new entries there.
+
+## Accessibility
+
+Keyboard accessibility is a priority. All interactive UI must be fully operable via keyboard.
+
+- **Modals**: Use the `Modal` component (`src/renderer/src/components/Modal.tsx`). It provides Escape-to-close, focus trapping, backdrop click-to-close, `role="dialog"`, and `aria-modal="true"`.
+- **Toast notifications**: Use `ToastNotification` + `useToast` from `src/renderer/src/components/Toast.tsx` for all ephemeral messages (saves, deletes, errors). Toasts are fixed-position (bottom-right) to avoid layout shift — never render them inline in the document flow. The component handles `role="alert"` for errors and `role="status"` for success automatically.
+- **Focus management**: When opening a modal or panel, focus the first interactive element. When closing, return focus to the trigger element where practical.
+- **ARIA labels**: Provide `aria-label` for icon-only buttons and actions whose purpose isn't clear from visible text alone.

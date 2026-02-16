@@ -9,5 +9,8 @@ export const Channels = {
   TasksCreate: 'tasks:create',
   TasksUpdate: 'tasks:update',
   TasksArchive: 'tasks:archive',
-  TasksFocus: 'tasks:focus'
+  TasksFocus: 'tasks:focus',
+  DialogOpenImage: 'dialog:open-image',
+  ColorsExtractPalette: 'colors:extract-palette',
+  FilesCopyToAppData: 'files:copy-to-app-data'
 } as const
