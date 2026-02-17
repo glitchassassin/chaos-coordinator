@@ -1,7 +1,7 @@
 ---
 id: T-008
 title: 'Context Capture (Shelving)'
-status: ready
+status: done
 priority: 3
 dependencies: ['T-002']
 spec_refs: ['§5.1', '§5.2']

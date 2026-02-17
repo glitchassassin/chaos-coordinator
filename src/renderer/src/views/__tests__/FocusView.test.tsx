@@ -340,11 +340,13 @@ describe('FocusView', () => {
   })
 
   describe('Complete action', () => {
-    it('progresses task from planning to in_progress', async () => {
+    it('opens context capture modal when begin work is clicked', async () => {
       const user = userEvent.setup()
-      mockInvoke.mockResolvedValueOnce(baseFocusResponse) // Initial load
-      mockInvoke.mockResolvedValueOnce({ id: 1 }) // Update call
-      mockInvoke.mockResolvedValueOnce(baseFocusResponse) // Reload
+      mockInvoke.mockImplementation((channel: string) => {
+        if (channel === 'tasks:focus') return Promise.resolve(baseFocusResponse)
+
+        return Promise.resolve(null)
+      })
 
       renderFocusView()
 
@@ -356,23 +358,16 @@ describe('FocusView', () => {
       await user.click(completeBtn)
 
       await waitFor(() => {
-        expect(mockInvoke).toHaveBeenCalledWith('tasks:update', {
-          id: 1,
-          column: TaskColumn.InProgress
-        })
+        expect(screen.getByText('Capture Context')).toBeInTheDocument()
       })
     })
 
-    it('archives task when in review column', async () => {
+    it('progresses task from planning to in_progress after confirming context', async () => {
       const user = userEvent.setup()
-      const reviewTask: FocusResponse = {
-        ...baseFocusResponse,
-        task: { ...baseFocusResponse.task!, column: TaskColumn.Review }
-      }
-
-      mockInvoke.mockResolvedValueOnce(reviewTask) // Initial load
-      mockInvoke.mockResolvedValueOnce({ id: 1 }) // Archive call
-      mockInvoke.mockResolvedValueOnce(baseFocusResponse) // Reload
+      mockInvoke.mockImplementation((channel: string) => {
+        if (channel === 'tasks:focus') return Promise.resolve(baseFocusResponse)
+        return Promise.resolve({ id: 1 })
+      })
 
       renderFocusView()
 
@@ -380,20 +375,86 @@ describe('FocusView', () => {
         expect(screen.getByText('Implement new feature')).toBeInTheDocument()
       })
 
-      const completeBtn = screen.getByRole('button', { name: /archive/i })
-      await user.click(completeBtn)
+      await user.click(screen.getByRole('button', { name: /begin work/i }))
+
+      await waitFor(() => {
+        expect(screen.getByText('Capture Context')).toBeInTheDocument()
+      })
+
+      await user.click(screen.getByRole('button', { name: /confirm/i }))
+
+      await waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith('tasks:update', {
+          id: 1,
+          contextBlock: baseFocusResponse.task!.contextBlock,
+          column: TaskColumn.InProgress
+        })
+      })
+    })
+
+    it('archives task when in review column after confirming context', async () => {
+      const user = userEvent.setup()
+      const reviewTask: FocusResponse = {
+        ...baseFocusResponse,
+        task: { ...baseFocusResponse.task!, column: TaskColumn.Review }
+      }
+
+      mockInvoke.mockImplementation((channel: string) => {
+        if (channel === 'tasks:focus') return Promise.resolve(reviewTask)
+        return Promise.resolve({ id: 1 })
+      })
+
+      renderFocusView()
+
+      await waitFor(() => {
+        expect(screen.getByText('Implement new feature')).toBeInTheDocument()
+      })
+
+      await user.click(screen.getByRole('button', { name: /archive/i }))
+
+      await waitFor(() => {
+        expect(screen.getByText('Capture Context')).toBeInTheDocument()
+      })
+
+      await user.click(screen.getByRole('button', { name: /confirm/i }))
 
       await waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith('tasks:archive', { id: 1 })
       })
     })
 
-    it('reloads focus task after completion', async () => {
+    it('cancelling context capture does not update the task', async () => {
       const user = userEvent.setup()
+      mockInvoke.mockImplementation((channel: string) => {
+        if (channel === 'tasks:focus') return Promise.resolve(baseFocusResponse)
+        return Promise.resolve(null)
+      })
 
-      // Mock to return baseFocusResponse for all calls
-      mockInvoke.mockImplementation((channel) => {
+      renderFocusView()
+
+      await waitFor(() => {
+        expect(screen.getByText('Implement new feature')).toBeInTheDocument()
+      })
+
+      await user.click(screen.getByRole('button', { name: /begin work/i }))
+
+      await waitFor(() => {
+        expect(screen.getByText('Capture Context')).toBeInTheDocument()
+      })
+
+      await user.click(screen.getByRole('button', { name: /cancel/i }))
+
+      expect(mockInvoke).not.toHaveBeenCalledWith('tasks:update', expect.anything())
+      expect(mockInvoke).not.toHaveBeenCalledWith('tasks:archive', expect.anything())
+    })
+
+    it('reloads focus task after completing transition', async () => {
+      const user = userEvent.setup()
+      let focusCallCount = 0
+
+      mockInvoke.mockImplementation((channel: string) => {
         if (channel === 'tasks:focus') {
+          focusCallCount++
           return Promise.resolve(baseFocusResponse)
         }
         return Promise.resolve({ id: 1 })
@@ -405,31 +466,19 @@ describe('FocusView', () => {
         expect(screen.getByText('Implement new feature')).toBeInTheDocument()
       })
 
-      const initialCallCount = mockInvoke.mock.calls.filter(
-        (call) => call[0] === 'tasks:focus'
-      ).length
+      const initialFocusCalls = focusCallCount
 
-      const completeBtn = screen.getByRole('button', { name: /begin work/i })
-      await user.click(completeBtn)
+      await user.click(screen.getByRole('button', { name: /begin work/i }))
 
-      // Wait for the update call
+      await waitFor(() => {
+        expect(screen.getByText('Capture Context')).toBeInTheDocument()
+      })
+
+      await user.click(screen.getByRole('button', { name: /confirm/i }))
+
       await waitFor(
         () => {
-          expect(mockInvoke).toHaveBeenCalledWith('tasks:update', {
-            id: 1,
-            column: TaskColumn.InProgress
-          })
-        },
-        { timeout: 1000 }
-      )
-
-      // Verify focus was called again after update (for reload)
-      await waitFor(
-        () => {
-          const focusCalls = mockInvoke.mock.calls.filter(
-            (call) => call[0] === 'tasks:focus'
-          )
-          expect(focusCalls.length).toBeGreaterThan(initialCallCount)
+          expect(focusCallCount).toBeGreaterThan(initialFocusCalls)
         },
         { timeout: 1000 }
       )
@@ -437,7 +486,49 @@ describe('FocusView', () => {
   })
 
   describe('Defer action', () => {
-    it('defers current task and shows next available task', async () => {
+    it('opens context capture modal when defer is clicked', async () => {
+      const user = userEvent.setup()
+      mockInvoke.mockImplementation((channel: string) => {
+        if (channel === 'tasks:focus') return Promise.resolve(baseFocusResponse)
+        return Promise.resolve(null)
+      })
+
+      renderFocusView()
+
+      await waitFor(() => {
+        expect(screen.getByText('Implement new feature')).toBeInTheDocument()
+      })
+
+      await user.click(screen.getByRole('button', { name: /defer/i }))
+
+      await waitFor(() => {
+        expect(screen.getByText('Capture Context')).toBeInTheDocument()
+      })
+    })
+
+    it('shows skip button in defer modal', async () => {
+      const user = userEvent.setup()
+      mockInvoke.mockImplementation((channel: string) => {
+        if (channel === 'tasks:focus') return Promise.resolve(baseFocusResponse)
+        return Promise.resolve(null)
+      })
+
+      renderFocusView()
+
+      await waitFor(() => {
+        expect(screen.getByText('Implement new feature')).toBeInTheDocument()
+      })
+
+      await user.click(screen.getByRole('button', { name: /defer/i }))
+
+      await waitFor(() => {
+        expect(screen.getByText('Capture Context')).toBeInTheDocument()
+      })
+
+      expect(screen.getByRole('button', { name: /skip/i })).toBeInTheDocument()
+    })
+
+    it('defers without updating context when skip is clicked', async () => {
       const user = userEvent.setup()
 
       const task2: FocusResponse = {
@@ -446,18 +537,14 @@ describe('FocusView', () => {
         queueDepth: { actionable: 2, waiting: 0 }
       }
 
-      let callCount = 0
-      mockInvoke.mockImplementation((channel) => {
+      let focusCallCount = 0
+      mockInvoke.mockImplementation((channel: string) => {
         if (channel === 'tasks:focus') {
-          callCount++
-          // After defer, the deferred task might still be returned by engine
-          // but component logic will handle showing empty or next task
-          return Promise.resolve(callCount === 1 ? baseFocusResponse : task2)
+          focusCallCount++
+          return Promise.resolve(focusCallCount === 1 ? baseFocusResponse : task2)
         }
-        if (channel === 'tasks:list') {
-          // Return both tasks
+        if (channel === 'tasks:list')
           return Promise.resolve([baseFocusResponse.task, task2.task])
-        }
         return Promise.resolve(null)
       })
 
@@ -467,10 +554,14 @@ describe('FocusView', () => {
         expect(screen.getByText('Implement new feature')).toBeInTheDocument()
       })
 
-      const deferBtn = screen.getByRole('button', { name: /defer/i })
-      await user.click(deferBtn)
+      await user.click(screen.getByRole('button', { name: /defer/i }))
 
-      // Wait for transition to complete
+      await waitFor(() => {
+        expect(screen.getByText('Capture Context')).toBeInTheDocument()
+      })
+
+      await user.click(screen.getByRole('button', { name: /skip/i }))
+
       await waitFor(
         () => {
           expect(mockInvoke).toHaveBeenCalledWith('tasks:focus')
@@ -478,29 +569,17 @@ describe('FocusView', () => {
         { timeout: 1000 }
       )
 
-      // Should NOT have called tasks:update or tasks:archive
+      // Should NOT have called tasks:update (context not saved on skip)
       expect(mockInvoke).not.toHaveBeenCalledWith('tasks:update', expect.anything())
-      expect(mockInvoke).not.toHaveBeenCalledWith('tasks:archive', expect.anything())
     })
 
-    it('shows oldest deferred task when no other tasks exist', async () => {
+    it('saves context and defers when confirm is clicked', async () => {
       const user = userEvent.setup()
-
-      mockInvoke.mockImplementation((channel) => {
-        if (channel === 'tasks:focus') {
-          // Only one task exists
-          return Promise.resolve({
-            ...baseFocusResponse,
-            queueDepth: { actionable: 1, waiting: 0 }
-          })
-        }
-        if (channel === 'tasks:list') {
-          return Promise.resolve([baseFocusResponse.task])
-        }
-        if (channel === 'projects:get') {
-          return Promise.resolve(baseFocusResponse.project)
-        }
-        return Promise.resolve(null)
+      mockInvoke.mockImplementation((channel: string) => {
+        if (channel === 'tasks:focus') return Promise.resolve(baseFocusResponse)
+        if (channel === 'tasks:list') return Promise.resolve([baseFocusResponse.task])
+        if (channel === 'projects:get') return Promise.resolve(baseFocusResponse.project)
+        return Promise.resolve({ id: 1 })
       })
 
       renderFocusView()
@@ -509,16 +588,20 @@ describe('FocusView', () => {
         expect(screen.getByText('Implement new feature')).toBeInTheDocument()
       })
 
-      const deferBtn = screen.getByRole('button', { name: /defer/i })
-      await user.click(deferBtn)
+      await user.click(screen.getByRole('button', { name: /defer/i }))
 
-      // Task should reappear since it's the only one
-      await waitFor(
-        () => {
-          expect(screen.getByText('Implement new feature')).toBeInTheDocument()
-        },
-        { timeout: 1000 }
-      )
+      await waitFor(() => {
+        expect(screen.getByText('Capture Context')).toBeInTheDocument()
+      })
+
+      await user.click(screen.getByRole('button', { name: /confirm/i }))
+
+      await waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith('tasks:update', {
+          id: 1,
+          contextBlock: baseFocusResponse.task!.contextBlock
+        })
+      })
     })
   })
 

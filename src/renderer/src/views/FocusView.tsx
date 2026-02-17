@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import type { Task, Project, Trigger, Link } from '../../../shared/types/models'
 import { TaskColumn } from '../../../shared/types/enums'
 import { textColorOn } from '../../../shared/lib/color-utils'
+import ContextCapture from '../components/ContextCapture'
 
 interface FocusData {
   task: Task | null
@@ -44,11 +45,17 @@ interface DeferredTask {
 
 const DEFER_DURATION_MS = 30 * 60 * 1000 // 30 minutes
 
+interface CaptureState {
+  type: 'phase' | 'defer'
+  toColumn: TaskColumn | 'archive'
+}
+
 export default function FocusView() {
   const navigate = useNavigate()
   const [focusData, setFocusData] = useState<FocusData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isTransitioning, setIsTransitioning] = useState(false)
+  const [captureState, setCaptureState] = useState<CaptureState | null>(null)
   const deferredTasksRef = useRef<DeferredTask[]>([])
 
   const loadFocusTask = useCallback(async () => {
@@ -163,51 +170,94 @@ export default function FocusView() {
     void loadFocusTask()
   }, [loadFocusTask])
 
-  const handleComplete = async () => {
+  const handleComplete = () => {
     if (!focusData?.task) return
-
-    setIsTransitioning(true)
     const nextColumn = COLUMN_PROGRESSION[focusData.task.column]
-
-    try {
-      if (nextColumn === 'archive') {
-        await window.api.invoke('tasks:archive', { id: focusData.task.id })
-      } else if (nextColumn) {
-        await window.api.invoke('tasks:update', {
-          id: focusData.task.id,
-          column: nextColumn
-        })
-      }
-      // Wait for transition animation
-      setTimeout(() => {
-        void loadFocusTask().then(() => {
-          setIsTransitioning(false)
-        })
-      }, 400)
-    } catch (error) {
-      console.error('Failed to update task:', error)
-      setIsTransitioning(false)
-    }
+    if (!nextColumn) return
+    setCaptureState({ type: 'phase', toColumn: nextColumn })
   }
 
   const handleDefer = () => {
     if (!focusData?.task) return
+    setCaptureState({ type: 'defer', toColumn: focusData.task.column })
+  }
 
+  const executeDeferTransition = () => {
+    if (!focusData?.task) return
     const taskId = focusData.task.id
     setIsTransitioning(true)
-
-    // Add task to deferred list (using ref for immediate access)
     deferredTasksRef.current = [
       ...deferredTasksRef.current.filter((d) => d.taskId !== taskId),
       { taskId, deferredAt: Date.now() }
     ]
-
-    // Wait for transition animation, then reload
     setTimeout(() => {
       void loadFocusTask().then(() => {
         setIsTransitioning(false)
       })
     }, 400)
+  }
+
+  const handleCaptureConfirm = async (contextBlock: string) => {
+    if (!focusData?.task || !captureState) return
+    const normalizedContext: string | null = contextBlock || null
+    setCaptureState(null)
+    setIsTransitioning(true)
+
+    const task = focusData.task
+    const { type, toColumn } = captureState
+
+    try {
+      if (type === 'phase') {
+        if (toColumn === 'archive') {
+          // Save context then archive. No columnHistory record — 'archive' is not a
+          // valid column in the schema enum, so we skip history for the terminal state.
+          await window.api.invoke('tasks:update', {
+            id: task.id,
+            contextBlock: normalizedContext
+          })
+          await window.api.invoke('tasks:archive', { id: task.id })
+        } else {
+          // Save context + new column in one call, then record history
+          await window.api.invoke('tasks:update', {
+            id: task.id,
+            contextBlock: normalizedContext,
+            column: toColumn
+          })
+          await window.api.invoke('columnHistory:create', {
+            taskId: task.id,
+            fromColumn: task.column,
+            toColumn,
+            contextSnapshot: normalizedContext
+          })
+        }
+        setTimeout(() => {
+          void loadFocusTask().then(() => {
+            setIsTransitioning(false)
+          })
+        }, 400)
+      } else {
+        // Defer: save updated context, then let executeDeferTransition own the
+        // full transition lifecycle (including clearing isTransitioning after 400ms)
+        await window.api.invoke('tasks:update', {
+          id: task.id,
+          contextBlock: normalizedContext
+        })
+        executeDeferTransition()
+      }
+    } catch (error) {
+      console.error('Failed to save context:', error)
+      setIsTransitioning(false)
+    }
+  }
+
+  const handleCaptureSkip = () => {
+    // Defer only — skip saving context and proceed
+    setCaptureState(null)
+    executeDeferTransition()
+  }
+
+  const handleCaptureCancel = () => {
+    setCaptureState(null)
   }
 
   if (isLoading) {
@@ -332,9 +382,7 @@ export default function FocusView() {
           {/* Actions */}
           <div className="flex gap-3 pt-4">
             <button
-              onClick={() => {
-                void handleComplete()
-              }}
+              onClick={handleComplete}
               disabled={isTransitioning}
               className="rounded-lg px-6 py-3 font-medium transition-opacity hover:opacity-90 disabled:opacity-50"
               style={{
@@ -386,6 +434,21 @@ export default function FocusView() {
           <span>No tasks in queue</span>
         )}
       </div>
+
+      {captureState && (
+        <ContextCapture
+          open={true}
+          task={task}
+          fromColumn={task.column}
+          toColumn={captureState.toColumn}
+          transitionType={captureState.type}
+          onConfirm={(contextBlock) => {
+            void handleCaptureConfirm(contextBlock)
+          }}
+          onSkip={handleCaptureSkip}
+          onCancel={handleCaptureCancel}
+        />
+      )}
     </div>
   )
 }

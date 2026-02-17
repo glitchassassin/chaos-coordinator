@@ -3,6 +3,7 @@ import type { Project, Task, Trigger, InsertTask } from '@shared/types/models'
 import { TaskColumn, TriggerStatus } from '@shared/types/enums'
 import { timeElapsed } from '@shared/lib/time-utils'
 import Modal from '../components/Modal'
+import ContextCapture from '../components/ContextCapture'
 import ToastNotification from '../components/Toast'
 import { useToast } from '../hooks/useToast'
 
@@ -70,6 +71,13 @@ export default function BoardView() {
   const draggedLane = useRef<number | null>(null)
   const dragOverLane = useRef<number | null>(null)
 
+  // Context capture state for drag transitions
+  const [dragCapture, setDragCapture] = useState<{
+    task: Task
+    fromColumn: TaskColumn
+    toColumn: TaskColumn
+  } | null>(null)
+
   const loadBoard = useCallback(async () => {
     try {
       const [projects, tasks] = await Promise.all([
@@ -122,22 +130,61 @@ export default function BoardView() {
     dragOverColumn.current = column
   }
 
-  const handleCardDrop = async (e: React.DragEvent) => {
+  const handleCardDrop = (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
     if (!draggedCard.current || !dragOverColumn.current) return
 
     const { taskId } = draggedCard.current
-    const column = dragOverColumn.current
+    const toColumn = dragOverColumn.current
 
+    draggedCard.current = null
+    dragOverColumn.current = null
+
+    // Find the task in swim lanes to get its current column
+    let foundTask: Task | null = null
+    for (const lane of swimLanes) {
+      for (const tasks of Object.values(lane.tasks)) {
+        const match = tasks.find((twt) => twt.task.id === taskId)
+        if (match) {
+          foundTask = match.task
+          break
+        }
+      }
+      if (foundTask) break
+    }
+
+    if (!foundTask) return
+
+    // If column didn't change, no-op
+    if (foundTask.column === toColumn) return
+
+    // Prompt for context capture before moving
+    setDragCapture({ task: foundTask, fromColumn: foundTask.column, toColumn })
+  }
+
+  const executeDragTransition = async (
+    task: Task,
+    fromColumn: TaskColumn,
+    toColumn: TaskColumn,
+    contextBlock: string
+  ) => {
+    const normalizedContext: string | null = contextBlock || null
     try {
-      await window.api.invoke('tasks:update', { id: taskId, column })
+      await window.api.invoke('tasks:update', {
+        id: task.id,
+        contextBlock: normalizedContext,
+        column: toColumn
+      })
+      await window.api.invoke('columnHistory:create', {
+        taskId: task.id,
+        fromColumn,
+        toColumn,
+        contextSnapshot: normalizedContext
+      })
       await loadBoard()
     } catch {
       showToast('Failed to move task', 'error')
-    } finally {
-      draggedCard.current = null
-      dragOverColumn.current = null
     }
   }
 
@@ -337,7 +384,9 @@ export default function BoardView() {
                       onDragOver={(e) => {
                         handleCardDragOver(e, col.key)
                       }}
-                      onDrop={(e) => void handleCardDrop(e)}
+                      onDrop={(e) => {
+                        handleCardDrop(e)
+                      }}
                       className="flex min-h-[60px] flex-col rounded-lg border border-dashed border-gray-800 p-2"
                     >
                       <div className="flex-1 space-y-2">
@@ -516,6 +565,27 @@ export default function BoardView() {
           </div>
         )}
       </Modal>
+
+      {dragCapture && (
+        <ContextCapture
+          open={true}
+          task={dragCapture.task}
+          fromColumn={dragCapture.fromColumn}
+          toColumn={dragCapture.toColumn}
+          transitionType="phase"
+          onConfirm={(contextBlock) => {
+            const { task, fromColumn, toColumn } = dragCapture
+            setDragCapture(null)
+            void executeDragTransition(task, fromColumn, toColumn, contextBlock)
+          }}
+          onSkip={() => {
+            setDragCapture(null)
+          }}
+          onCancel={() => {
+            setDragCapture(null)
+          }}
+        />
+      )}
 
       <ToastNotification toast={toast} />
     </div>

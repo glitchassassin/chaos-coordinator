@@ -6,7 +6,8 @@
 
 - Most view tests use `Object.defineProperty(window, 'api', {...})` for mocking `window.api`
 - FocusView test uses `vi.stubGlobal('api', {...})` -- inconsistent but both work
-- Existing test files: `App.test.tsx`, `BoardView.test.tsx`, `ProjectsView.test.tsx`, `SettingsView.test.tsx`, `FocusView.test.tsx`
+- ContextCapture test also uses `vi.stubGlobal('api', {...})` -- same pattern as FocusView
+- Existing test files: `App.test.tsx`, `BoardView.test.tsx`, `ProjectsView.test.tsx`, `SettingsView.test.tsx`, `FocusView.test.tsx`, `ContextCapture.test.tsx`
 - Tests use `@testing-library/react` + `userEvent` + `vitest`
 - Coverage: 80% overall, 90%+ for critical business logic (priority engine, trigger system, command safety)
 - Coverage thresholds enforced globally (80%) in `vitest.config.ts` lines 59-64, not per-file
@@ -15,7 +16,7 @@
 
 - Playwright config: `playwright.config.ts` (testDir: `./e2e`, 30s timeout, workers: 1)
 - Global setup: `e2e/global-setup.ts` rebuilds better-sqlite3 for Electron
-- E2E files: `app.spec.ts` (smoke), `board-view.spec.ts`, `focus-view.spec.ts`, `projects.spec.ts`, `settings.spec.ts`
+- E2E files: `app.spec.ts` (smoke), `board-view.spec.ts`, `focus-view.spec.ts`, `projects.spec.ts`, `settings.spec.ts`, `context-capture.spec.ts`
 - Helpers: `e2e/helpers.ts` (launchApp, waitForReady, navigateTo, createTestDataDir, cleanupTestDataDir)
 - Seed utils: `e2e/seed.ts` (seedProject, seedTask, clearAllData via renderer IPC)
 - Test isolation: each spec file gets its own Electron instance + temp userData dir
@@ -41,6 +42,7 @@
 - Toasts: Must use `ToastNotification` + `useToast` from `src/renderer/src/components/Toast.tsx`
 - Focus management: First interactive element on modal open, return to trigger on close
 - ARIA labels required for icon-only buttons
+- ContextCapture modal uses Modal component correctly -- inherits dialog role, focus trap, Escape-to-close
 
 ### Naming & Style
 
@@ -53,6 +55,7 @@
 
 - Renderer code should prefer `@shared/*` alias over relative `../../../shared/*`
 - BoardView and ProjectsView use `@shared/*`; SettingsView, FocusView use relative paths (inconsistency)
+- ContextCapture uses relative paths (same as FocusView pattern)
 - `@shared` alias configured in `tsconfig.web.json`
 
 ### Key Files
@@ -64,6 +67,8 @@
 - ConfigStore: `src/main/config/store.ts` (lazy configPath getter for test isolation)
 - App entry (main): `src/main/index.ts` (reads `CHAOS_COORDINATOR_TEST_DATA` env var)
 - E2E helpers: `e2e/helpers.ts`, E2E seed: `e2e/seed.ts`, E2E guide: `docs/references/e2e-testing.md`
+- ContextCapture component: `src/renderer/src/components/ContextCapture.tsx`
+- ColumnHistory IPC handler: `src/main/ipc/columnHistory.ts`
 
 ### Common Review Issues
 
@@ -74,3 +79,6 @@
 - **Timestamp format inconsistency**: `new Date().toISOString()` vs SQLite `datetime('now')`
 - **Test fixture completeness**: When adding fields to shared `Task` interface, check ALL test fixtures
 - **clearAllData in e2e only deletes projects** -- tasks survive with null projectId. Works because views exclude them, but could cause issues if behavior changes.
+- **ContextCapture useEffect deps**: The `[open]` dep array with eslint-disable is intentional -- avoids re-running LLM call when task/column props change after initial open
+- **No columnHistory record for archive transitions**: FocusView archive path saves context but skips columnHistory entry
+- **Double isTransitioning in defer+confirm**: `handleCaptureConfirm` sets transitioning, then defer branch calls `executeDeferTransition()` which also sets it

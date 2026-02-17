@@ -1,4 +1,13 @@
-import type { Project, InsertProject, Task, InsertTask, Trigger, Link } from './models'
+import type {
+  Project,
+  InsertProject,
+  Task,
+  InsertTask,
+  Trigger,
+  Link,
+  ColumnHistory,
+  InsertColumnHistory
+} from './models'
 import type {
   ConfigKey,
   ConfigValueMap,
@@ -69,6 +78,8 @@ export interface IpcChannelMap {
   'config:getAll': { request: undefined; response: MaskedConfig }
   'config:getSchema': { request: undefined; response: ConfigSchemaMetadata }
   'config:reset': { request: { key: ConfigKey }; response: boolean }
+
+  'columnHistory:create': { request: InsertColumnHistory; response: ColumnHistory }
 
   'dialog:open-image': { request: undefined; response: string | null }
   'files:copy-to-app-data': {

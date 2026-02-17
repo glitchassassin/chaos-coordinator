@@ -91,7 +91,7 @@ test('focus view: backlog tasks are not shown (only planning/in_progress/review)
   await expect(window.getByText('Backlog Task')).not.toBeVisible()
 })
 
-test('focus view: complete action advances task to next column', async () => {
+test('focus view: complete action opens context capture then advances task to next column', async () => {
   const project = await seedProject(window, { name: 'Advance Project' })
   await seedTask(window, {
     title: 'Task To Advance',
@@ -106,24 +106,25 @@ test('focus view: complete action advances task to next column', async () => {
     window.getByRole('heading', { name: 'Task To Advance', level: 1 })
   ).toBeVisible()
 
-  // The action button for planning → in_progress is "Begin Work"
   await expect(window.getByText('Begin Work')).toBeVisible()
   await window.getByText('Begin Work').click()
+
+  // Context capture modal should appear
+  await expect(window.getByRole('dialog')).toBeVisible()
+  await expect(window.getByText('Capture Context')).toBeVisible()
+
+  // Confirm the context capture
+  await window.getByRole('button', { name: 'Confirm' }).click()
 
   // Wait for transition
   await window.waitForTimeout(600)
 
-  // The action button should now show the next stage label since the task
-  // advanced to in_progress (same task, still focused), or empty state
-  // if it was the only task.
-  // Either way, the board should reflect the change:
+  // Verify the change on the board
   await navigateTo(window, 'board')
-
-  // Task should now be in In Progress column
   await expect(window.getByText('Task To Advance')).toBeVisible()
 })
 
-test('focus view: archive action archives task from review column', async () => {
+test('focus view: archive action opens context capture then archives task from review column', async () => {
   const project = await seedProject(window, { name: 'Review Stage Project' })
   await seedTask(window, {
     title: 'Task In Review',
@@ -140,6 +141,16 @@ test('focus view: archive action archives task from review column', async () => 
   // Use button role to avoid ambiguity with the "Archive" nav link
   await expect(window.getByRole('button', { name: 'Archive' })).toBeVisible()
   await window.getByRole('button', { name: 'Archive' }).click()
+
+  // Context capture modal should appear
+  await expect(window.getByRole('dialog')).toBeVisible()
+  await expect(window.getByText('Capture Context')).toBeVisible()
+
+  // Wait for generating state to resolve
+  await window.waitForTimeout(500)
+
+  // Confirm the context capture
+  await window.getByRole('button', { name: 'Confirm' }).click()
 
   // Wait for transition
   await window.waitForTimeout(600)

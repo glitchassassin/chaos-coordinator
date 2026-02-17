@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion -- DOM queries in tests use ! after null checks */
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import userEvent from '@testing-library/user-event'
 import BoardView from '../BoardView'
 import type { Project, Task } from '../../../../shared/types/models'
 import { TaskColumn } from '../../../../shared/types/enums'
@@ -113,6 +114,9 @@ describe('BoardView', () => {
       }
       if (channel === 'projects:update') {
         return Promise.resolve(mockProjects[0]!)
+      }
+      if (channel === 'columnHistory:create') {
+        return Promise.resolve({ id: 1 })
       }
       return Promise.resolve(undefined)
     })
@@ -388,7 +392,8 @@ describe('BoardView', () => {
     expect(mockApi.invoke).not.toHaveBeenCalledWith('tasks:create', expect.anything())
   })
 
-  it('simulates column drag with tasks:update call', async () => {
+  it('simulates column drag: shows context capture modal then updates task', async () => {
+    const user = userEvent.setup()
     render(<BoardView />)
 
     await waitFor(() => {
@@ -407,9 +412,18 @@ describe('BoardView', () => {
     fireEvent.dragOver(alphaPlanningColumn)
     fireEvent.drop(alphaPlanningColumn)
 
+    // Context capture modal should appear (column change detected)
+    await waitFor(() => {
+      expect(screen.getByText('Capture Context')).toBeInTheDocument()
+    })
+
+    // Confirm the capture
+    await user.click(screen.getByRole('button', { name: /confirm/i }))
+
     await waitFor(() => {
       expect(mockApi.invoke).toHaveBeenCalledWith('tasks:update', {
         id: 1,
+        contextBlock: null, // task has no existing context
         column: TaskColumn.Planning
       })
     })
