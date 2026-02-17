@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import ReactMarkdown from 'react-markdown'
 import type { Task, Project, Trigger, Link } from '../../../shared/types/models'
 import { TaskColumn } from '../../../shared/types/enums'
 import { textColorOn } from '../../../shared/lib/color-utils'
@@ -329,14 +330,78 @@ export default function FocusView() {
           {/* Context block */}
           {task.contextBlock && (
             <div
-              className="rounded-lg p-6 text-lg leading-relaxed opacity-90"
+              tabIndex={0}
+              role="region"
+              aria-label="Task context"
+              className="max-h-64 overflow-y-auto rounded-lg p-6 text-lg leading-relaxed opacity-90"
               style={{
                 backgroundColor:
                   accentTextColor === '#ffffff' ? '#00000020' : '#ffffff20',
                 color: accentTextColor
               }}
             >
-              {task.contextBlock}
+              <ReactMarkdown
+                components={{
+                  p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
+                  ul: ({ children }) => (
+                    <ul className="mb-3 list-disc pl-5 last:mb-0">{children}</ul>
+                  ),
+                  ol: ({ children }) => (
+                    <ol className="mb-3 list-decimal pl-5 last:mb-0">{children}</ol>
+                  ),
+                  li: ({ children }) => <li className="mb-1">{children}</li>,
+                  h1: ({ children }) => (
+                    <h1 className="mb-2 text-2xl font-bold">{children}</h1>
+                  ),
+                  h2: ({ children }) => (
+                    <h2 className="mb-2 text-xl font-bold">{children}</h2>
+                  ),
+                  h3: ({ children }) => (
+                    <h3 className="mb-2 text-lg font-semibold">{children}</h3>
+                  ),
+                  a: ({ children, href }) => (
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline opacity-80 hover:opacity-100"
+                    >
+                      {children}
+                    </a>
+                  ),
+                  code: ({ children, className }) =>
+                    className ? (
+                      <code className={className}>{children}</code>
+                    ) : (
+                      <code
+                        className="rounded px-1 py-0.5 font-mono text-base opacity-80"
+                        style={{
+                          backgroundColor:
+                            accentTextColor === '#ffffff' ? '#00000030' : '#ffffff30'
+                        }}
+                      >
+                        {children}
+                      </code>
+                    ),
+                  pre: ({ children }) => (
+                    <pre
+                      className="mb-3 overflow-x-auto rounded p-3 font-mono text-base last:mb-0"
+                      style={{
+                        backgroundColor:
+                          accentTextColor === '#ffffff' ? '#00000030' : '#ffffff30'
+                      }}
+                    >
+                      {children}
+                    </pre>
+                  ),
+                  strong: ({ children }) => (
+                    <strong className="font-bold">{children}</strong>
+                  ),
+                  em: ({ children }) => <em className="italic">{children}</em>
+                }}
+              >
+                {task.contextBlock}
+              </ReactMarkdown>
             </div>
           )}
 
