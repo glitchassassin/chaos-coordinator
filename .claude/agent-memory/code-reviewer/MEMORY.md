@@ -69,6 +69,7 @@
 - E2E helpers: `e2e/helpers.ts`, E2E seed: `e2e/seed.ts`, E2E guide: `docs/references/e2e-testing.md`
 - ContextCapture component: `src/renderer/src/components/ContextCapture.tsx`
 - ColumnHistory IPC handler: `src/main/ipc/columnHistory.ts`
+- react-markdown v10.1.0 used for rendering markdown in FocusView context block
 
 ### Common Review Issues
 

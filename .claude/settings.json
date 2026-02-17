@@ -73,7 +73,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cd /Users/jon/repos/chaos-coordinator && npm run validate"
+            "command": "bash .claude/scripts/validate-hook.sh"
           },
           {
             "type": "agent",
