@@ -5,6 +5,13 @@ import { registerIpcHandlers } from './ipc'
 import { runMigrations } from './db/migrate'
 import { configStore } from './config'
 
+// Test isolation: override userData path if env var is set.
+// Must be called before app.whenReady() so all subsequent app.getPath('userData')
+// calls return the test directory.
+if (process.env['CHAOS_COORDINATOR_TEST_DATA']) {
+  app.setPath('userData', process.env['CHAOS_COORDINATOR_TEST_DATA'])
+}
+
 // Register custom scheme before app is ready — serves project images in both dev and production
 protocol.registerSchemesAsPrivileged([
   { scheme: 'media', privileges: { standard: true, secure: true, supportFetchAPI: true } }

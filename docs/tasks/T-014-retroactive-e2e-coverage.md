@@ -1,7 +1,7 @@
 ---
 id: T-014
 title: 'Retroactive E2E Test Coverage'
-status: ready
+status: done
 priority: 3
 dependencies: []
 spec_refs: []

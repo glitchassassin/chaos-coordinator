@@ -23,13 +23,22 @@ import type {
  * Manages reading, writing, encrypting, and validating configuration values.
  */
 export class ConfigStore {
-  private configPath: string
+  private configPathOverride: string | undefined
   private cache: RuntimeConfig | null = null
   private encryptionAvailable: boolean = false
 
+  /**
+   * The resolved config file path.
+   * Computed lazily so app.setPath() overrides take effect before first access.
+   */
+  private get configPath(): string {
+    return this.configPathOverride ?? join(app.getPath('userData'), 'config.json')
+  }
+
   constructor(configPath?: string) {
-    // Default to userData/config.json
-    this.configPath = configPath || join(app.getPath('userData'), 'config.json')
+    // Store optional override — do not call app.getPath() here so that
+    // app.setPath() calls (e.g. for test isolation) can take effect first.
+    this.configPathOverride = configPath
 
     // Check if encryption is available (only after app is ready)
     if (app.isReady()) {

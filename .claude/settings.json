@@ -76,7 +76,7 @@
             "command": "cd /Users/jon/repos/chaos-coordinator && npm run validate"
           },
           {
-            "type": "prompt",
+            "type": "agent",
             "prompt": "If code changes have been made and the task is complete, the code-reviewer agent must have been invoked to review the most recent changes. It is not needed for docs changes."
           }
         ]

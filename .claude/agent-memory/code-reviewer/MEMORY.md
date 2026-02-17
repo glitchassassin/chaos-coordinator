@@ -11,13 +11,29 @@
 - Coverage: 80% overall, 90%+ for critical business logic (priority engine, trigger system, command safety)
 - Coverage thresholds enforced globally (80%) in `vitest.config.ts` lines 59-64, not per-file
 
+### E2E Testing Patterns
+
+- Playwright config: `playwright.config.ts` (testDir: `./e2e`, 30s timeout, workers: 1)
+- Global setup: `e2e/global-setup.ts` rebuilds better-sqlite3 for Electron
+- E2E files: `app.spec.ts` (smoke), `board-view.spec.ts`, `focus-view.spec.ts`, `projects.spec.ts`, `settings.spec.ts`
+- Helpers: `e2e/helpers.ts` (launchApp, waitForReady, navigateTo, createTestDataDir, cleanupTestDataDir)
+- Seed utils: `e2e/seed.ts` (seedProject, seedTask, clearAllData via renderer IPC)
+- Test isolation: each spec file gets its own Electron instance + temp userData dir
+- `clearAllData` only deletes projects; tasks survive with `projectId: null` due to `onDelete: 'set null'`. Works because views exclude unassigned tasks (inner join / projectId filter).
+- Navigation helper uses `waitForTimeout(300)` -- fixed delay
+- Data seeding goes through renderer `window.api.invoke()` via `page.evaluate()`
+- After seeding, navigate away and back to trigger data reload (no reactive subscription to DB)
+- HashRouter used (not BrowserRouter) for Electron file:// URL compatibility
+- Seeding via page.evaluate uses `any` cast on `window` with eslint-disable comment
+
 ### Architecture Boundaries
 
 - Renderer uses `window.api.invoke(channel, payload)` for all IPC -- never accesses DB directly
 - Shared types in `src/shared/types/` must not import from `src/main/` (cross-process boundary)
 - Drizzle schema in `src/main/db/schema/` is canonical data model
-- Priority engine: `src/main/priority/engine.ts` -- pure function `computeFocus(db)`
+- Priority engine: `src/main/priority/engine.ts` -- pure function `computeFocus(db)` uses innerJoin on projects
 - `tasks:list` with `{ archived: false }` returns ALL non-archived tasks including backlog and trigger-blocked
+- `computeFocus` uses `innerJoin` on projects, so tasks with null projectId are excluded
 
 ### Component Conventions
 
@@ -39,29 +55,22 @@
 - BoardView and ProjectsView use `@shared/*`; SettingsView, FocusView use relative paths (inconsistency)
 - `@shared` alias configured in `tsconfig.web.json`
 
-### E2E Testing Patterns
-
-- Playwright config: `playwright.config.ts` (testDir: `./e2e`, 30s timeout)
-- Existing e2e: `e2e/app.spec.ts` (smoke test), `e2e/helpers.ts` (launchApp)
-- T-014 establishes e2e infrastructure: helpers, seeding via `app.evaluate()`, navigation helpers
-- E2E sections in task files follow pattern: intro sentence + numbered scenarios + verification step
-- LLM-dependent tasks address mocking: seed pre-computed data, test degradation paths, or mock IPC
-- Backend-only tasks (T-009) delegate e2e to consuming UI tasks
-- DnD testing in Playwright may need custom helpers for `@dnd-kit` compatibility
-
 ### Key Files
 
 - IPC type map: `src/shared/types/ipc.ts` (IpcChannelMap)
 - Preload bridge: `src/preload/index.ts`
 - DB schema index: `src/main/db/schema/index.ts`
-- Color utilities: `src/shared/lib/color-utils.ts` (hexToRgb, textColorOn, relativeLuminance, contrastRatio, ciede2000)
-- E2E helpers: `e2e/helpers.ts`, E2E smoke test: `e2e/app.spec.ts`
+- Color utilities: `src/shared/lib/color-utils.ts`
+- ConfigStore: `src/main/config/store.ts` (lazy configPath getter for test isolation)
+- App entry (main): `src/main/index.ts` (reads `CHAOS_COORDINATOR_TEST_DATA` env var)
+- E2E helpers: `e2e/helpers.ts`, E2E seed: `e2e/seed.ts`, E2E guide: `docs/references/e2e-testing.md`
 
 ### Common Review Issues
 
 - Drizzle with better-sqlite3 is synchronous; `.insert().values()` without `.run()`/`.get()` does NOT execute
 - Client-side priority sorting in renderer can diverge from engine logic -- watch for missing filters
 - `tasks:list { archived: false }` includes backlog + trigger-blocked tasks that `computeFocus` would exclude
-- **handleSaveEdit in BoardView always sends `column` in update payload** -- any IPC handler logic that checks `data.column !== undefined` will trigger on every edit, not just column changes. Watch for this pattern.
-- **Timestamp format inconsistency**: `new Date().toISOString()` produces `2024-01-15T10:30:00.000Z`, SQLite `datetime('now')` produces `2024-01-15 10:30:00`. Both parse correctly via `new Date()` but look different in the DB.
-- **Test fixture completeness**: When adding fields to shared `Task` interface, check ALL test fixtures including inline ones inside individual test cases, not just top-level fixtures. TypeScript may not catch missing fields in loosely-typed contexts (array spreads, etc.).
+- **handleSaveEdit in BoardView always sends `column` in update payload** -- watch for side effects
+- **Timestamp format inconsistency**: `new Date().toISOString()` vs SQLite `datetime('now')`
+- **Test fixture completeness**: When adding fields to shared `Task` interface, check ALL test fixtures
+- **clearAllData in e2e only deletes projects** -- tasks survive with null projectId. Works because views exclude them, but could cause issues if behavior changes.
