@@ -18,7 +18,7 @@ updated: 2026-02-14
 
 When triggers fire or the priority queue changes, the user needs to know — but without disruption. Chaos Coordinator uses ambient notifications: subtle visual indicators that the user notices at their next natural pause. No modals, no system notification popups, no sounds by default.
 
-This is the last piece of the trigger-to-action pipeline: trigger fires (T-010) → task becomes actionable (T-001) → user is notified (this task) → user engages (T-004 Focus View).
+This is the last piece of the trigger-to-action pipeline: trigger fires (T-010b) → task becomes actionable (T-001) → user is notified (this task) → user engages (T-004 Focus View).
 
 ## Requirements
 
@@ -37,7 +37,7 @@ This is the last piece of the trigger-to-action pipeline: trigger fires (T-010) 
 
 ## Existing Code
 
-- **Trigger system**: T-010 fires triggers in the main process
+- **Trigger system**: T-010b fires triggers in the main process
 - **Priority engine**: T-001 re-evaluates priorities
 - **Focus View**: T-004 shows queue indicator
 - **Board View**: T-005 shows card states

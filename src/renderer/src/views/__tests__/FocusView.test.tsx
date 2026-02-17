@@ -170,6 +170,7 @@ describe('FocusView', () => {
     it('does not render context block when null', async () => {
       const responseWithoutContext: FocusResponse = {
         ...baseFocusResponse,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         task: { ...baseFocusResponse.task!, contextBlock: null }
       }
 
@@ -366,6 +367,7 @@ describe('FocusView', () => {
       const user = userEvent.setup()
       const reviewTask: FocusResponse = {
         ...baseFocusResponse,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         task: { ...baseFocusResponse.task!, column: TaskColumn.Review }
       }
 
@@ -441,6 +443,7 @@ describe('FocusView', () => {
 
       const task2: FocusResponse = {
         ...baseFocusResponse,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         task: { ...baseFocusResponse.task!, id: 2, title: 'Second task' },
         queueDepth: { actionable: 2, waiting: 0 }
       }
@@ -455,7 +458,8 @@ describe('FocusView', () => {
         }
         if (channel === 'tasks:list') {
           // Return both tasks
-          return Promise.resolve([baseFocusResponse.task, task2.task])
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+          return Promise.resolve([baseFocusResponse.task!, task2.task])
         }
         return Promise.resolve(null)
       })
@@ -494,7 +498,8 @@ describe('FocusView', () => {
           })
         }
         if (channel === 'tasks:list') {
-          return Promise.resolve([baseFocusResponse.task])
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+          return Promise.resolve([baseFocusResponse.task!])
         }
         if (channel === 'projects:get') {
           return Promise.resolve(baseFocusResponse.project)
@@ -543,6 +548,7 @@ describe('FocusView', () => {
     it('shows correct action label for backlog column', async () => {
       const backlogTask: FocusResponse = {
         ...baseFocusResponse,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         task: { ...baseFocusResponse.task!, column: TaskColumn.Backlog }
       }
 
@@ -568,6 +574,7 @@ describe('FocusView', () => {
     it('shows correct action label for in_progress column', async () => {
       const inProgressTask: FocusResponse = {
         ...baseFocusResponse,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         task: { ...baseFocusResponse.task!, column: TaskColumn.InProgress }
       }
 
@@ -584,6 +591,7 @@ describe('FocusView', () => {
     it('shows correct action label for review column', async () => {
       const reviewTask: FocusResponse = {
         ...baseFocusResponse,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         task: { ...baseFocusResponse.task!, column: TaskColumn.Review }
       }
 
