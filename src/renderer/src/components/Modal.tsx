@@ -10,6 +10,20 @@ interface ModalProps {
 export default function Modal({ open, onClose, children, className = '' }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null)
 
+  // Focus the first focusable element only when the modal opens (not on every render)
+  useEffect(() => {
+    if (!open) return
+
+    const overlay = overlayRef.current
+    if (overlay) {
+      const firstFocusable = overlay.querySelector<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )
+      firstFocusable?.focus()
+    }
+  }, [open])
+
+  // Keyboard handler: Escape to close, Tab to trap focus
   useEffect(() => {
     if (!open) return
 
@@ -48,15 +62,6 @@ export default function Modal({ open, onClose, children, className = '' }: Modal
     }
 
     document.addEventListener('keydown', handleKeyDown)
-
-    // Focus first focusable element on open
-    const overlay = overlayRef.current
-    if (overlay) {
-      const firstFocusable = overlay.querySelector<HTMLElement>(
-        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-      )
-      firstFocusable?.focus()
-    }
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
