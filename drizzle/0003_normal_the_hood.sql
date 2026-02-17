@@ -1,0 +1,1 @@
+ALTER TABLE `tasks` ADD `column_changed_at` text DEFAULT (datetime('now')) NOT NULL;

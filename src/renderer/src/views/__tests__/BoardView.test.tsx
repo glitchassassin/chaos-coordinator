@@ -38,6 +38,7 @@ const mockTasks: Task[] = [
     column: TaskColumn.Backlog,
     projectId: 1,
     archived: false,
+    columnChangedAt: '2024-01-01T10:00:00Z',
     lastTouchedAt: '2024-01-01',
     createdAt: '2024-01-01',
     updatedAt: '2024-01-01T10:00:00Z'
@@ -49,6 +50,7 @@ const mockTasks: Task[] = [
     column: TaskColumn.Planning,
     projectId: 1,
     archived: false,
+    columnChangedAt: '2024-01-02T14:00:00Z',
     lastTouchedAt: '2024-01-02',
     createdAt: '2024-01-02',
     updatedAt: '2024-01-02T14:00:00Z'
@@ -60,6 +62,7 @@ const mockTasks: Task[] = [
     column: TaskColumn.InProgress,
     projectId: 2,
     archived: false,
+    columnChangedAt: '2024-01-03T08:00:00Z',
     lastTouchedAt: '2024-01-03',
     createdAt: '2024-01-03',
     updatedAt: '2024-01-03T08:00:00Z'
@@ -71,6 +74,7 @@ const mockTasks: Task[] = [
     column: TaskColumn.Review,
     projectId: 2,
     archived: false,
+    columnChangedAt: '2024-01-04T16:00:00Z',
     lastTouchedAt: '2024-01-04',
     createdAt: '2024-01-04',
     updatedAt: '2024-01-04T16:00:00Z'
@@ -167,6 +171,7 @@ describe('BoardView', () => {
         column: TaskColumn.Planning,
         projectId: 1,
         archived: false,
+        columnChangedAt: '2024-01-05T12:00:00Z',
         lastTouchedAt: '2024-01-05',
         createdAt: '2024-01-05',
         updatedAt: '2024-01-05T12:00:00Z'

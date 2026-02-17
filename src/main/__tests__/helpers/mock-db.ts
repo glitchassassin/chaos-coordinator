@@ -38,6 +38,7 @@ export function createMockDb(): AppDatabase {
       "column" TEXT NOT NULL DEFAULT 'planning',
       project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       archived INTEGER NOT NULL DEFAULT 0,
+      column_changed_at TEXT NOT NULL DEFAULT (datetime('now')),
       last_touched_at TEXT NOT NULL DEFAULT (datetime('now')),
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))

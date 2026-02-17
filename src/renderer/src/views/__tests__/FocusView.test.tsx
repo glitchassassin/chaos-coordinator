@@ -35,6 +35,7 @@ const baseFocusResponse: FocusResponse = {
     column: TaskColumn.Planning,
     projectId: 1,
     archived: false,
+    columnChangedAt: '2024-01-01',
     lastTouchedAt: '2024-01-01',
     createdAt: '2024-01-01',
     updatedAt: '2024-01-01'

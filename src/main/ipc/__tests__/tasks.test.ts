@@ -100,6 +100,7 @@ describe('Tasks IPC Handlers', () => {
           column: TaskColumn.Backlog,
           projectId: 1,
           archived: false,
+          columnChangedAt: '2024-01-01',
           lastTouchedAt: '2024-01-01',
           createdAt: '2024-01-01',
           updatedAt: '2024-01-01'
@@ -133,6 +134,7 @@ describe('Tasks IPC Handlers', () => {
           column: TaskColumn.Backlog,
           projectId: 1,
           archived: false,
+          columnChangedAt: '2024-01-01',
           lastTouchedAt: '2024-01-01',
           createdAt: '2024-01-01',
           updatedAt: '2024-01-01'
@@ -215,6 +217,7 @@ describe('Tasks IPC Handlers', () => {
         column: TaskColumn.Backlog,
         projectId: 1,
         archived: false,
+        columnChangedAt: '2024-01-01',
         lastTouchedAt: '2024-01-01',
         createdAt: '2024-01-01',
         updatedAt: '2024-01-01'
@@ -274,6 +277,7 @@ describe('Tasks IPC Handlers', () => {
         column: TaskColumn.Backlog,
         projectId: 1,
         archived: false,
+        columnChangedAt: '2024-01-01',
         lastTouchedAt: '2024-01-01',
         createdAt: '2024-01-01',
         updatedAt: '2024-01-01'
@@ -309,6 +313,7 @@ describe('Tasks IPC Handlers', () => {
         column: TaskColumn.InProgress,
         projectId: 1,
         archived: false,
+        columnChangedAt: '2024-01-02',
         lastTouchedAt: '2024-01-02',
         createdAt: '2024-01-01',
         updatedAt: '2024-01-02'
@@ -337,6 +342,106 @@ describe('Tasks IPC Handlers', () => {
       expect(result).toEqual(updatedTask)
       expect(mockDb.update).toHaveBeenCalled()
     })
+
+    it('sets columnChangedAt when column actually changes', () => {
+      registerTaskHandlers()
+
+      const existingTask: Task = {
+        id: 1,
+        title: 'Task',
+        contextBlock: null,
+        column: TaskColumn.Backlog,
+        projectId: 1,
+        archived: false,
+        columnChangedAt: '2024-01-01',
+        lastTouchedAt: '2024-01-01',
+        createdAt: '2024-01-01',
+        updatedAt: '2024-01-01'
+      }
+
+      mockDb.select.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            get: vi.fn().mockReturnValue(existingTask),
+            all: vi.fn()
+          }),
+          all: vi.fn()
+        })
+      })
+
+      const setMock = vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockReturnValue({
+            get: vi.fn().mockReturnValue(existingTask)
+          })
+        })
+      })
+      mockDb.update.mockReturnValue({ set: setMock })
+
+      const calls = vi.mocked(ipcMain.handle).mock.calls
+      const handler = calls.find((call) => call[0] === Channels.TasksUpdate)?.[1]
+
+      handler?.({} as Electron.IpcMainInvokeEvent, {
+        id: 1,
+        column: TaskColumn.Planning
+      })
+
+      expect(setMock).toHaveBeenCalledOnce()
+      const [firstCall] = setMock.mock.calls
+      const calledWith = firstCall?.[0] as Record<string, unknown>
+      expect(calledWith).toHaveProperty('column', TaskColumn.Planning)
+      expect(calledWith).toHaveProperty('columnChangedAt')
+    })
+
+    it('does not set columnChangedAt when column is unchanged', () => {
+      registerTaskHandlers()
+
+      const existingTask: Task = {
+        id: 1,
+        title: 'Task',
+        contextBlock: null,
+        column: TaskColumn.Planning,
+        projectId: 1,
+        archived: false,
+        columnChangedAt: '2024-01-01',
+        lastTouchedAt: '2024-01-01',
+        createdAt: '2024-01-01',
+        updatedAt: '2024-01-01'
+      }
+
+      mockDb.select.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            get: vi.fn().mockReturnValue(existingTask),
+            all: vi.fn()
+          }),
+          all: vi.fn()
+        })
+      })
+
+      const setMock = vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockReturnValue({
+            get: vi.fn().mockReturnValue(existingTask)
+          })
+        })
+      })
+      mockDb.update.mockReturnValue({ set: setMock })
+
+      const calls = vi.mocked(ipcMain.handle).mock.calls
+      const handler = calls.find((call) => call[0] === Channels.TasksUpdate)?.[1]
+
+      handler?.({} as Electron.IpcMainInvokeEvent, {
+        id: 1,
+        title: 'Updated title',
+        column: TaskColumn.Planning
+      })
+
+      expect(setMock).toHaveBeenCalledOnce()
+      const [firstCall] = setMock.mock.calls
+      const calledWith = firstCall?.[0] as Record<string, unknown>
+      expect(calledWith).not.toHaveProperty('columnChangedAt')
+    })
   })
 
   describe('tasks:archive', () => {
@@ -350,6 +455,7 @@ describe('Tasks IPC Handlers', () => {
         column: TaskColumn.Review,
         projectId: 1,
         archived: true,
+        columnChangedAt: '2024-01-02',
         lastTouchedAt: '2024-01-02',
         createdAt: '2024-01-01',
         updatedAt: '2024-01-02'
@@ -388,6 +494,7 @@ describe('Tasks IPC Handlers', () => {
           column: TaskColumn.Backlog,
           projectId: 1,
           archived: false,
+          columnChangedAt: '2024-01-01',
           lastTouchedAt: '2024-01-01',
           createdAt: '2024-01-01',
           updatedAt: '2024-01-01'

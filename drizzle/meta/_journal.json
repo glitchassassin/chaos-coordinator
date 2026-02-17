@@ -22,6 +22,13 @@
       "when": 1771186218014,
       "tag": "0002_classy_mantis",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1771298378200,
+      "tag": "0003_normal_the_hood",
+      "breakpoints": true
     }
   ]
 }

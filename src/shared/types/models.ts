@@ -32,6 +32,7 @@ export interface Task {
   column: TaskColumn
   projectId: number | null
   archived: boolean
+  columnChangedAt: string
   lastTouchedAt: string
   createdAt: string
   updatedAt: string

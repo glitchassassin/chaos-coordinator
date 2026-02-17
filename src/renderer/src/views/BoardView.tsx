@@ -539,7 +539,7 @@ function TaskCard({ taskWithTrigger, onDragStart, onDragEnd, onClick }: TaskCard
 
   const isTriggered = isRecentlyFired(trigger)
 
-  const timeInColumn = timeElapsed(task.updatedAt)
+  const timeInColumn = timeElapsed(task.columnChangedAt)
 
   return (
     <div

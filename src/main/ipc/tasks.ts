@@ -47,7 +47,13 @@ export function registerTaskHandlers(): void {
     Channels.TasksUpdate,
     (_event, { id, ...data }: { id: number } & Partial<InsertTask>) => {
       const db = getDb()
-      return db.update(tasks).set(data).where(eq(tasks.id, id)).returning().get()
+      const existing = db.select().from(tasks).where(eq(tasks.id, id)).get()
+      const columnChanged =
+        data.column !== undefined && existing && data.column !== existing.column
+      const update = columnChanged
+        ? { ...data, columnChangedAt: new Date().toISOString() }
+        : data
+      return db.update(tasks).set(update).where(eq(tasks.id, id)).returning().get()
     }
   )
 

@@ -15,6 +15,9 @@ export const tasks = sqliteTable('tasks', {
     onDelete: 'set null'
   }),
   archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
+  columnChangedAt: text('column_changed_at')
+    .notNull()
+    .default(sql`(datetime('now'))`),
   lastTouchedAt: text('last_touched_at')
     .notNull()
     .default(sql`(datetime('now'))`),
