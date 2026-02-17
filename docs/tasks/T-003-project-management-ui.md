@@ -1,7 +1,7 @@
 ---
 id: T-003
 title: 'Project Management UI'
-status: review
+status: done
 priority: 2
 dependencies: []
 spec_refs: ['§8.1', '§8.2']

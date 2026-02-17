@@ -1,7 +1,7 @@
 ---
 id: T-005
 title: 'Board View'
-status: in-progress
+status: done
 priority: 2
 dependencies: []
 spec_refs: ['§2.2']

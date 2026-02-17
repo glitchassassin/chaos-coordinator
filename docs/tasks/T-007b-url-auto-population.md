@@ -9,100 +9,103 @@ adrs: []
 estimated_complexity: M
 tags: [workflow, llm]
 created: 2026-02-16
-updated: 2026-02-16
+updated: 2026-02-17
 ---
 
 # T-007b: URL-based Auto-population
 
 ## Context
 
-This task enhances the intake form (T-007a) with smart URL-based auto-population. When the user pastes a URL (GitHub issue, PR, Azure DevOps work item), the system detects the source, fetches metadata via CLI tools, generates an LLM context summary, and pre-populates the form fields.
+When a user pastes a URL into the quick-add field on the Board View, the app detects it as a URL and triggers an auto-population flow instead of a plain title entry. A task is created immediately (with the URL as its temporary title), then metadata is fetched from the URL's source (GitHub, Azure DevOps), an LLM generates a context summary, and the task is updated in place. The card shows a loading state during this process and can be cancelled.
 
-Split from T-007 (Task Intake). Requires T-007a (the intake form shell).
+> **Scope change from original spec**: This was originally framed as enhancing an intake form's URL field. The intake form has been dropped — instead, URL detection happens in the existing quick-add field on the Board View. T-007a is still a prerequisite because it adds the `links:create` IPC infrastructure that this task uses to save auto-populated links.
 
 ## Requirements
 
-1. **Source detection**: When a URL is pasted into the intake form's URL field, detect the source type:
-   - `github.com/<owner>/<repo>/issues/<number>` → GitHub issue
-   - `github.com/<owner>/<repo>/pull/<number>` → GitHub PR
-   - `dev.azure.com/<org>/<project>/_workitems/edit/<id>` → Azure DevOps work item
-   - Anything else → generic URL (no metadata fetch, just store as link)
+1. **URL detection in quick-add**: When the user types or pastes a value into the quick-add title field, detect if it is a URL (starts with `http://` or `https://`). If so, suppress normal title-based creation and trigger the auto-population flow instead.
 
-2. **CLI metadata fetch**: For recognized URLs, fetch metadata from the main process:
-   - **GitHub issue**: `gh issue view <number> --repo <owner/repo> --json title,body,state,labels,assignees,comments`
-   - **GitHub PR**: `gh pr view <number> --repo <owner/repo> --json title,body,state,labels,reviewDecision,statusCheckRollup,comments`
+2. **Immediate task creation**: Create the task right away via `tasks:create` with `title` set to the pasted URL and the column/project from the quick-add context. The task card appears on the board immediately.
+
+3. **Loading state**: The newly created card shows a loading indicator (spinner) and is visually dimmed. The card is not clickable/editable while loading. A cancel button ("✕") is visible on the card.
+
+4. **Cancel**: Clicking cancel calls `tasks:archive` to remove the card from the board and aborts the in-flight fetch if still running.
+
+5. **Source detection**: In the main process, parse the URL to detect its type:
+   - `github.com/<owner>/<repo>/issues/<number>` → `github_issue`
+   - `github.com/<owner>/<repo>/pull/<number>` → `github_pr`
+   - `dev.azure.com/<org>/<project>/_workitems/edit/<id>` → `azure_devops`
+   - Anything else → `other` (skip metadata fetch, go straight to success with URL as title)
+
+6. **CLI metadata fetch**: For recognized source types, run the appropriate CLI command from the main process:
+   - **GitHub issue**: `gh issue view <number> --repo <owner>/<repo> --json title,body,state,labels,assignees`
+   - **GitHub PR**: `gh pr view <number> --repo <owner>/<repo> --json title,body,state,labels,reviewDecision,statusCheckRollup`
    - **Azure DevOps**: `az boards work-item show --id <id> --org <org> --project <project>`
 
-3. **LLM context generation**: Send fetched metadata to the LLM to generate a 3–5 sentence context summary covering: what the task is about, key constraints/decisions, and a suggested next action.
+7. **LLM context generation**: Send the fetched metadata to the LLM to generate a 3–5 sentence context summary: what the task is about, key constraints or decisions, and the next concrete action.
 
-4. **Project auto-association**: Match the repository from the URL against existing projects' `repoAssociations`. If matched, auto-select the project. If unknown, leave the project selector for the user to choose.
+8. **Project auto-association**: Compare the URL's `owner/repo` (or `org/project`) against each project's `repoAssociations`. If matched, update the task's `projectId` to the matched project. If no match, leave the task in its original project (the one the quick-add column belongs to).
 
-5. **Form pre-population**: After fetch + LLM generation:
-   - Title <- linked resource's title (editable)
-   - Context block <- LLM-generated summary (editable)
-   - Links <- the pasted URL with correct `sourceType` + any discovered linked resources
-   - Project <- auto-matched or left empty
+9. **On success**: Update the task via `tasks:update` with: `title` ← resource title, `contextBlock` ← LLM summary. Create links via `links:create`: the original URL with the detected `sourceType` and `isPrimary: true`.
 
-6. **Graceful degradation**: If `gh` or `az` is not installed, or the command fails (auth, network), fall back to manual entry — still store the URL as a link.
+10. **On failure** (CLI not installed, auth failure, network error, LLM error): Update the task via `tasks:update` with `title` set to the pasted URL (already set from creation, so this is a no-op in effect). Clear the loading state. The card becomes a normal editable task with the URL as its title.
 
-7. **Loading state**: Show a spinner/progress indicator while fetching metadata and generating context.
+11. **Loading state is renderer-only**: Track which task IDs are currently fetching in a `Set` in React state (or context). No DB column needed — if the app restarts mid-fetch, the task remains with the URL as title, which is the same as the failure state.
 
 ## Existing Code
 
-- **Intake form**: T-007a provides the form UI with all fields
-- **IPC**: `tasks:create`, `projects:list`
-- **LLM service**: T-002 provides `generateText`/`generateObject`
-- **Links schema**: `src/main/db/schema/links.ts` — `sourceType` field for `github_issue`, `github_pr`, `azure_devops`, `other`
+- **Quick-add**: `src/renderer/src/views/BoardView.tsx` — `handleInlineAdd()`, the inline title input per column
+- **IPC**: `tasks:create`, `tasks:update`, `tasks:archive`, `links:create` (added by T-007a), `projects:list`
+- **LLM service**: `src/main/llm/` — `generateText` / `generateObject` from T-002
+- **Links schema**: `src/main/db/schema/links.ts` — `sourceType`, `isPrimary` fields
 - **Projects schema**: `repoAssociations` field on projects
 
 ## Implementation Notes
 
-- **URL parser**: Create `src/main/cli/urlParser.ts` — parses URLs to detect source type and extract owner/repo/number or org/project/id.
-- **CLI executor**: Create `src/main/cli/executor.ts` — runs CLI commands via `child_process.execFile`, returns stdout/stderr. All commands here are read-only.
-- **IPC channels**: Add `intake:fetchMetadata` IPC channel that takes a URL, detects type, runs the CLI command, and returns structured metadata.
-- **LLM prompt**: "Given the following [issue/PR/work item] metadata, write a 3–5 sentence context summary for a developer picking up this work. Cover: what this is about, key constraints or decisions already made, and the next concrete action to take."
-- **Repo matching**: Compare the URL's `owner/repo` against each project's `repoAssociations` array. Case-insensitive match.
-- **Enhancement to intake form**: Add an `onUrlPaste` handler to the URL field in T-007a's form. When a URL is pasted and detected as a known source, trigger the fetch flow. Pre-fill fields but keep them editable.
+- **URL detection**: A simple regex or `URL` constructor check in the renderer, before calling `handleInlineAdd`. If it starts with `http://` or `https://`, branch to the auto-populate flow.
+- **New IPC channel**: `intake:fetchMetadata` — takes `{ url: string }`, returns `{ title: string, contextBlock: string, sourceType: LinkSourceType, repoKey: string | null }` or throws on unrecoverable error. Graceful degradation (CLI missing, auth failed) returns `null` so the renderer can handle it as a failure.
+- **URL parser**: Create `src/main/cli/urlParser.ts` — parses URLs to detect `sourceType` and extract owner/repo/number or org/project/id.
+- **CLI executor**: Create `src/main/cli/executor.ts` — wraps `child_process.execFile` with a timeout. Returns stdout or throws with a structured error. All commands are read-only.
+- **Abort**: Use an `AbortController` (or just ignore the result) when the user cancels. Since the task is already archived on cancel, a late-arriving result should be dropped if the task no longer exists.
+- **Loading card UI**: Add a `fetchingTaskIds: Set<number>` state in BoardView. Cards whose id is in this set render the loading overlay instead of normal card content.
 
 ## Testing Requirements
 
 **Coverage target: 80% line coverage.**
 
-### Unit tests (node Vitest project):
+### Unit tests — node Vitest project:
 
-1. **URL parser — GitHub issue**: `github.com/org/repo/issues/42` -> `{ type: 'github_issue', owner: 'org', repo: 'repo', number: 42 }`.
-2. **URL parser — GitHub PR**: `github.com/org/repo/pull/99` -> `{ type: 'github_pr', ... }`.
-3. **URL parser — Azure DevOps**: `dev.azure.com/org/proj/_workitems/edit/123` -> `{ type: 'azure_devops', ... }`.
-4. **URL parser — generic**: `example.com/foo` -> `{ type: 'other' }`.
-5. **CLI metadata fetch**: Mock `child_process.execFile`. Verify correct commands constructed for each source type. Verify JSON parsing of CLI output.
-6. **CLI not installed**: Mock execFile failure — verify graceful degradation (returns null metadata).
-7. **Project auto-association**: Mock projects with `repoAssociations` — verify matching.
+1. **URL parser — GitHub issue**: `https://github.com/org/repo/issues/42` → `{ type: 'github_issue', owner: 'org', repo: 'repo', number: 42 }`.
+2. **URL parser — GitHub PR**: `https://github.com/org/repo/pull/99` → `{ type: 'github_pr', ... }`.
+3. **URL parser — Azure DevOps**: `https://dev.azure.com/org/proj/_workitems/edit/123` → `{ type: 'azure_devops', ... }`.
+4. **URL parser — generic**: `https://example.com/foo` → `{ type: 'other' }`.
+5. **CLI executor — success**: Mock `execFile` to resolve with JSON stdout — verify parsed result returned.
+6. **CLI executor — CLI not installed**: Mock `execFile` failure with ENOENT — verify null returned (graceful degradation).
+7. **Project auto-association**: Mock projects with `repoAssociations` — verify correct project matched; unmatched repo returns null.
 
-### Renderer tests (jsdom Vitest project):
+### Renderer tests — jsdom Vitest project:
 
-8. **URL paste triggers fetch**: Paste a GitHub URL — verify `intake:fetchMetadata` IPC is called.
-9. **Fields pre-populated**: After metadata returns, verify title, context, project, and links are filled.
-10. **Loading state**: While fetching, verify spinner is shown.
-11. **Graceful fallback**: When fetch fails, verify form remains usable with just the URL as a link.
-12. **Unknown repo**: URL from unassociated repo — verify project selector is not auto-filled.
+8. **URL paste triggers fetch**: Type a `https://` URL into quick-add and submit — verify `intake:fetchMetadata` IPC is called and task is created immediately.
+9. **Loading state shown**: While fetching, verify the card renders with a loading indicator and is not clickable.
+10. **Cancel archives task**: Click cancel on a loading card — verify `tasks:archive` is called with the task id.
+11. **On success — fields updated**: After metadata returns, verify `tasks:update` called with correct title and contextBlock, and `links:create` called with correct sourceType and isPrimary.
+12. **On failure — title stays as URL**: When `intake:fetchMetadata` throws, verify `tasks:update` is NOT called and loading state is cleared (card becomes normal editable task).
+13. **Generic URL — no metadata fetch**: Paste a non-GitHub/Azure URL — verify `intake:fetchMetadata` is still called but no CLI command runs, and the task is created with the URL as title.
 
 ## E2E Testing
 
-At least one Playwright e2e test covering the core user flow. Uses the e2e helpers and patterns established in T-014.
+Since this feature depends on external CLI tools and LLM calls, e2e tests focus on the graceful degradation path and UI flow.
 
-Since this feature depends on external CLI tools (`gh`, `az`) and LLM calls, the e2e test focuses on the graceful degradation path and the UI flow rather than actual metadata fetching.
-
-1. **Generic URL stored as link**: Open the intake form → paste a non-GitHub/Azure URL → verify the URL is added to the links section → submit → verify the created task has the URL as a link.
-2. **Loading state on recognized URL**: Paste a GitHub-shaped URL (the fetch will fail in test since `gh` won't be authed) → verify a loading indicator briefly appears → verify the form degrades gracefully to manual entry with the URL still stored as a link.
+1. **Generic URL creates task**: Seed a project → paste a generic `https://` URL into quick-add → verify a task card appears on the board with the URL as its title (no crash, no hang).
+2. **Cancel removes card**: Paste a GitHub-shaped URL (fetch will fail since `gh` won't be authed in test) → while loading indicator is visible, click cancel → verify the card is removed from the board.
+3. **Failure degrades gracefully**: Paste a GitHub-shaped URL → wait for fetch to fail → verify the card is no longer in loading state and has the URL as its title.
 
 ## Verification
 
-1. Run `npm run test` — URL intake tests pass.
+1. Run `npm run test` — all new tests pass.
 2. Run `npx playwright test e2e/url-auto-population.spec.ts` — e2e tests pass.
 3. Run `npm run dev`:
-   - Paste a GitHub issue URL into the intake form.
-   - Verify title and context auto-populate from metadata + LLM.
-   - Verify project auto-matches if the repo is associated.
-   - Confirm and verify the task appears on the board with correct links.
-   - Test with `gh` not authenticated — verify graceful fallback to manual entry.
-   - Test with a generic URL — verify it's stored as a link without metadata fetch.
+   - Paste a GitHub issue URL into the quick-add field — verify a loading card appears immediately, then populates with the issue title and LLM context.
+   - Paste a URL from a repo associated with a project — verify the task moves to that project.
+   - Paste a generic URL — verify task is created with the URL as title (no fetch attempted).
+   - Paste a GitHub URL with `gh` not authenticated — verify graceful fallback (URL stays as title, card becomes editable).
+   - Click cancel on a loading card — verify it disappears.
