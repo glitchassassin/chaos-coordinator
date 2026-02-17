@@ -3,7 +3,7 @@ id: T-012
 title: 'Notification System'
 status: ready
 priority: 4
-dependencies: ['T-010']
+dependencies: ['T-010b']
 spec_refs: ['§11.1']
 adrs: []
 estimated_complexity: M
