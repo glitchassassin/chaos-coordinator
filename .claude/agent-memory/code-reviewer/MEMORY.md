@@ -51,3 +51,6 @@
 - Drizzle with better-sqlite3 is synchronous; `.insert().values()` without `.run()`/`.get()` does NOT execute
 - Client-side priority sorting in renderer can diverge from engine logic -- watch for missing filters
 - `tasks:list { archived: false }` includes backlog + trigger-blocked tasks that `computeFocus` would exclude
+- **handleSaveEdit in BoardView always sends `column` in update payload** -- any IPC handler logic that checks `data.column !== undefined` will trigger on every edit, not just column changes. Watch for this pattern.
+- **Timestamp format inconsistency**: `new Date().toISOString()` produces `2024-01-15T10:30:00.000Z`, SQLite `datetime('now')` produces `2024-01-15 10:30:00`. Both parse correctly via `new Date()` but look different in the DB.
+- **Test fixture completeness**: When adding fields to shared `Task` interface, check ALL test fixtures including inline ones inside individual test cases, not just top-level fixtures. TypeScript may not catch missing fields in loosely-typed contexts (array spreads, etc.).
