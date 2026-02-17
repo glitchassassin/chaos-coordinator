@@ -71,6 +71,13 @@ This is the simplest of the three views.
 
 7. **Archive query**: Verify the query returns only archived tasks with correct joins.
 
+## E2E Testing
+
+At least one Playwright e2e test covering the core user flow. Uses the e2e helpers and patterns established in T-014.
+
+1. **Archive view displays completed tasks**: Seed archived tasks via the IPC bridge → navigate to Archive View → verify task titles, project indicators, and timestamps render.
+2. **Search filters tasks**: With multiple archived tasks seeded → type a search term → verify only matching tasks display.
+
 ## Documentation
 
 - No significant architectural additions — this is a straightforward read-only view.
@@ -78,7 +85,8 @@ This is the simplest of the three views.
 ## Verification
 
 1. Run `npm run test` — Archive View tests pass.
-2. Run `npm run dev`:
+2. Run `npx playwright test e2e/archive.spec.ts` — e2e tests pass.
+3. Run `npm run dev`:
    - Complete a few tasks (move through columns to archive).
    - Navigate to Archive View — see completed tasks with history.
    - Use search to filter by title.

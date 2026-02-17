@@ -93,10 +93,20 @@ This is critical-path business logic with 90%+ test coverage required (ADR 008).
 13. **Reject calls IPC**: Click Reject -> verify `triggers:reject` called.
 14. **Board View trigger badge**: Task with `awaiting_approval` trigger shows badge.
 
+## E2E Testing
+
+At least one Playwright e2e test covering the core user flow. Uses the e2e helpers and patterns established in T-014.
+
+Since trigger generation uses LLM calls, the e2e test should seed a trigger already in `awaiting_approval` status with a pre-generated script, then test the approval UI.
+
+1. **Approve trigger script**: Seed a task with a trigger in `awaiting_approval` status (including a `checkScript`) → navigate to Board View → verify the task card shows an approval badge → click the badge → verify the approval modal shows the script → click Approve → verify the trigger status updates on the card.
+2. **Reject trigger script**: Same setup → open approval modal → click Reject → verify the trigger status changes to cancelled.
+
 ## Verification
 
 1. Run `npm run test` — trigger generation and approval tests pass with 90%+ coverage on `src/main/triggers/generator.ts`.
-2. Run `npm run dev`:
+2. Run `npx playwright test e2e/trigger-approval.spec.ts` — e2e tests pass.
+3. Run `npm run dev`:
    - Create a task with a trigger condition via the intake form.
    - Verify the system generates a shell script and presents it for approval.
    - Read the script — verify it looks reasonable for the condition.

@@ -79,10 +79,20 @@ Split from T-011 (Chat Interface). See T-011b for agentic CLI execution and task
 9. **Streaming**: Verify tokens are sent back via IPC events.
 10. **Context building**: Verify system prompt includes current task/project state.
 
+## E2E Testing
+
+At least one Playwright e2e test covering the core user flow. Uses the e2e helpers and patterns established in T-014.
+
+Since the chat depends on LLM streaming, the e2e test focuses on the panel UI mechanics rather than response content. Mock or stub the LLM response via the IPC bridge if needed.
+
+1. **Chat panel opens and accepts input**: Click the chat toggle button → verify the panel slides open → type a message in the input → press Enter → verify the user message appears in the message list → verify an assistant message area appears (even if the response is an error due to no LLM configured).
+2. **Panel closes on Escape**: Open the chat panel → press Escape → verify the panel closes → verify the underlying view is still visible and functional.
+
 ## Verification
 
 1. Run `npm run test` — chat panel tests pass.
-2. Run `npm run dev`:
+2. Run `npx playwright test e2e/chat-panel.spec.ts` — e2e tests pass.
+3. Run `npm run dev`:
    - Open the chat panel from any view.
    - Ask "what tasks do I have?" — verify a streamed response listing current tasks.
    - Ask a follow-up question — verify conversation context is maintained.

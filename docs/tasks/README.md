@@ -23,6 +23,14 @@ Create projects, add tasks, visualize work. After this phase: open app → creat
 
 > **Note:** T-005 includes a quick-add feature for creating tasks directly from the board, which is sufficient for testing until T-007a (Task Intake Form) adds full-featured creation.
 
+### Phase 2.5: Retroactive E2E Coverage
+
+Add automated end-to-end tests for all completed work and establish e2e testing patterns for future tasks.
+
+| Task                                       | Title                         | Complexity | Dependencies |
+| ------------------------------------------ | ----------------------------- | ---------- | ------------ |
+| [T-014](T-014-retroactive-e2e-coverage.md) | Retroactive E2E Test Coverage | L          | —            |
+
 ### Phase 3: Focus & Flow
 
 The core experience loop — focus on the top task, capture context when switching. After this phase: full loop from project creation → task management → immersive focus mode → context-preserving transitions.
@@ -77,6 +85,7 @@ T-002 (LLM Integration) ──┬───────────────�
 T-013 (Config System)      — independent (done)
 T-003 (Project Mgmt UI)   — independent (done, prerequisite for all UI testing)
 T-005 (Board View)         — independent (done, includes quick-add for task creation)
+T-014 (E2E Coverage)       — independent (retroactive e2e for T-001–T-005, T-013; establishes e2e patterns)
 T-006 (Archive View)       — independent
 T-007a (Intake Form)       — independent
 ```
@@ -85,17 +94,18 @@ T-007a (Intake Form)       — independent
 
 Sequential order for solo development, optimized for continuous testability:
 
-1. **T-004** — Focus View _(immersive focus on top task)_
-2. **T-008** — Context Capture _(preserve state on transitions)_
-3. **T-007a** — Task Intake Form _(full-featured task creation)_
-4. **T-007b** — URL-based Auto-population _(paste URLs for auto-populated tasks)_
-5. **T-006** — Archive View _(view completed work)_
-6. **T-010a** — Trigger Generation + Approval _(create and review trigger scripts)_
-7. **T-010b** — Trigger Execution, Polling + Firing _(triggers actually run and fire)_
-8. **T-009** — Command Safety _(prerequisite for agentic chat)_
-9. **T-011a** — Chat Panel + Conversational LLM _(conversational interface)_
-10. **T-011b** — Agentic CLI + Task Management _(CLI execution and task ops via chat)_
-11. **T-012** — Notification System _(ambient updates from triggers)_
+1. **T-014** — Retroactive E2E Coverage _(e2e infrastructure + tests for completed tasks)_
+2. **T-004** — Focus View _(immersive focus on top task)_ — done
+3. **T-008** — Context Capture _(preserve state on transitions)_
+4. **T-007a** — Task Intake Form _(full-featured task creation)_
+5. **T-007b** — URL-based Auto-population _(paste URLs for auto-populated tasks)_
+6. **T-006** — Archive View _(view completed work)_
+7. **T-010a** — Trigger Generation + Approval _(create and review trigger scripts)_
+8. **T-010b** — Trigger Execution, Polling + Firing _(triggers actually run and fire)_
+9. **T-009** — Command Safety _(prerequisite for agentic chat)_
+10. **T-011a** — Chat Panel + Conversational LLM _(conversational interface)_
+11. **T-011b** — Agentic CLI + Task Management _(CLI execution and task ops via chat)_
+12. **T-012** — Notification System _(ambient updates from triggers)_
 
 ## Status Overview
 

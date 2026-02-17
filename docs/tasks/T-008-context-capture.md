@@ -82,10 +82,20 @@ The system uses LLM-generated summaries, informed by the task's current state an
 
 - Document the context capture flow and its integration points in `docs/ARCHITECTURE.md`.
 
+## E2E Testing
+
+At least one Playwright e2e test covering the core user flow. Uses the e2e helpers and patterns established in T-014.
+
+Since context capture uses LLM-generated text, the e2e test should either mock the LLM response via the IPC bridge or test the flow with a fallback/empty context.
+
+1. **Context capture on column transition**: Seed a task in Planning → navigate to Focus View → click "complete phase" → verify the context capture modal appears → confirm (or edit and confirm) → verify the task moves to In Progress and the context is saved.
+2. **Skip on defer**: Seed a task → navigate to Focus View → click "defer" → verify context capture prompt appears with a skip option → click skip → verify the next task appears without modifying the original task's context.
+
 ## Verification
 
 1. Run `npm run test` — context capture tests pass.
-2. Run `npm run dev`:
+2. Run `npx playwright test e2e/context-capture.spec.ts` — e2e tests pass.
+3. Run `npm run dev`:
    - Move a task from Planning to In Progress via Focus View — verify context capture dialog appears.
    - Confirm the generated context — verify it's saved and visible on the task.
    - Defer a task — verify context capture prompt with skip option.

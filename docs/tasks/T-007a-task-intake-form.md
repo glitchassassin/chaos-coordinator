@@ -73,10 +73,18 @@ Split from T-007 (Task Intake). See T-007b for URL-based auto-population.
 7. **Modal closes on success**: After successful creation, verify modal closes.
 8. **Keyboard navigation**: Verify Tab order and Escape-to-close.
 
+## E2E Testing
+
+At least one Playwright e2e test covering the core user flow. Uses the e2e helpers and patterns established in T-014.
+
+1. **Create task via intake form**: Seed a project → open Board View → open the intake form → fill in title, project, and column → submit → verify the task card appears on the board in the correct column and swim lane.
+2. **Validation prevents empty submit**: Open the intake form → submit with empty title → verify the form shows a validation error and does not close.
+
 ## Verification
 
 1. Run `npm run test` — intake form tests pass.
-2. Run `npm run dev`:
+2. Run `npx playwright test e2e/task-intake.spec.ts` — e2e tests pass.
+3. Run `npm run dev`:
    - Open the intake form from Board View.
    - Fill in title, context, select a project and column.
    - Add a link with a URL and label.

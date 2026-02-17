@@ -95,10 +95,21 @@ Split from T-011 (Chat Interface). Requires T-011a (chat panel) and T-009 (comma
 10. **Tool call display**: Tool calls shown in chat with name and arguments.
 11. **Command output formatting**: CLI output renders in code blocks.
 
+## E2E Testing
+
+At least one Playwright e2e test covering the core user flow. Uses the e2e helpers and patterns established in T-014.
+
+Agentic chat depends on LLM tool calling, so the e2e test focuses on the command approval UI flow. Seed a scenario where a mutating command approval is pending.
+
+1. **Mutating command shows approval UI**: Open chat → trigger a scenario where a mutating command is proposed (this may require mocking the LLM tool call response via the IPC bridge) → verify the approval dialog appears with the command in a code block and Approve/Reject buttons → click Reject → verify the chat continues with a rejection message.
+
+If mocking the full LLM tool call flow is too complex for e2e, this test can be deferred to be covered by the unit tests in the renderer project, with a note explaining why.
+
 ## Verification
 
 1. Run `npm run test` — agentic chat tests pass.
-2. Run `npm run dev`:
+2. Run `npx playwright test e2e/agentic-chat.spec.ts` — e2e tests pass.
+3. Run `npm run dev`:
    - Open chat and ask "what's the status of PR #123 in org/repo?" — verify it runs `gh pr view` automatically and shows results.
    - Ask "merge PR #123" — verify it shows the command for approval before executing.
    - Reject a mutating command — verify the LLM acknowledges the rejection.

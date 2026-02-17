@@ -78,10 +78,19 @@ This is the last piece of the trigger-to-action pipeline: trigger fires (T-010) 
 
 - Add a section to `docs/ARCHITECTURE.md` describing the notification/event system and the push model from main → renderer.
 
+## E2E Testing
+
+At least one Playwright e2e test covering the core user flow. Uses the e2e helpers and patterns established in T-014.
+
+Notifications depend on trigger firing (background timers), which is hard to orchestrate in e2e. Test the push-update mechanism directly.
+
+1. **Real-time board update on state change**: Navigate to Board View with seeded data → use `app.evaluate()` to simulate a state change event (e.g., fire a trigger or update a task's column directly in the DB and emit the event) → verify the Board View updates without manual refresh (card moves or changes visual state).
+
 ## Verification
 
 1. Run `npm run test` — notification system tests pass.
-2. Run `npm run dev`:
+2. Run `npx playwright test e2e/notifications.spec.ts` — e2e tests pass.
+3. Run `npm run dev`:
    - Create a task with a trigger that will fire soon.
    - Be on Focus View — when the trigger fires, observe the queue indicator update or the view transition.
    - Check the dock icon — verify a badge appears.

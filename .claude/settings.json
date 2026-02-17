@@ -76,9 +76,8 @@
             "command": "cd /Users/jon/repos/chaos-coordinator && npm run validate"
           },
           {
-            "type": "agent",
-            "prompt": "If changes have been made and the task is complete, check if the code-reviewer agent has already been invoked in this session. If not, invoke it now using the Task tool with subagent_type='code-reviewer'. Do NOT use the Skill tool — code-reviewer is a Task subagent, not a skill.",
-            "timeout": 600
+            "type": "prompt",
+            "prompt": "If code changes have been made and the task is complete, the code-reviewer agent must have been invoked to review the most recent changes. It is not needed for docs changes."
           }
         ]
       }

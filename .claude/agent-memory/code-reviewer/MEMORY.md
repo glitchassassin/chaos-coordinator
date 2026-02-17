@@ -39,12 +39,23 @@
 - BoardView and ProjectsView use `@shared/*`; SettingsView, FocusView use relative paths (inconsistency)
 - `@shared` alias configured in `tsconfig.web.json`
 
+### E2E Testing Patterns
+
+- Playwright config: `playwright.config.ts` (testDir: `./e2e`, 30s timeout)
+- Existing e2e: `e2e/app.spec.ts` (smoke test), `e2e/helpers.ts` (launchApp)
+- T-014 establishes e2e infrastructure: helpers, seeding via `app.evaluate()`, navigation helpers
+- E2E sections in task files follow pattern: intro sentence + numbered scenarios + verification step
+- LLM-dependent tasks address mocking: seed pre-computed data, test degradation paths, or mock IPC
+- Backend-only tasks (T-009) delegate e2e to consuming UI tasks
+- DnD testing in Playwright may need custom helpers for `@dnd-kit` compatibility
+
 ### Key Files
 
 - IPC type map: `src/shared/types/ipc.ts` (IpcChannelMap)
 - Preload bridge: `src/preload/index.ts`
 - DB schema index: `src/main/db/schema/index.ts`
 - Color utilities: `src/shared/lib/color-utils.ts` (hexToRgb, textColorOn, relativeLuminance, contrastRatio, ciede2000)
+- E2E helpers: `e2e/helpers.ts`, E2E smoke test: `e2e/app.spec.ts`
 
 ### Common Review Issues
 

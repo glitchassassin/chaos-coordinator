@@ -117,10 +117,19 @@ Test in the `node` Vitest project.
 18. **Manual override**: Clear waiting state -> task immediately actionable, trigger stopped.
 19. **Sentinel file flow**: Trigger with file-based check -> write sentinel file -> next poll exits 0 -> trigger fires.
 
+## E2E Testing
+
+At least one Playwright e2e test covering the core user flow. Uses the e2e helpers and patterns established in T-014.
+
+Trigger execution involves background timers and shell scripts, which are hard to test end-to-end without real waiting. Focus on the user-visible outcomes and manual override.
+
+1. **Manual override clears waiting state**: Seed a task with a trigger in `polling` status (task appears dimmed/waiting on Board View) → open the card edit → click "Clear waiting" → verify the task becomes actionable (full opacity, no waiting indicator) → navigate to Focus View → verify the task can appear as the focus task.
+
 ## Verification
 
 1. Run `npm run test` — execution and scheduling tests pass with 90%+ coverage on `src/main/triggers/executor.ts` and `src/main/triggers/scheduler.ts`.
-2. Run `npm run dev`:
+2. Run `npx playwright test e2e/trigger-execution.spec.ts` — e2e tests pass.
+3. Run `npm run dev`:
    - Approve a trigger — verify the immediate test runs.
    - If condition not met, verify polling starts (check logs or add debug indicator).
    - Manually satisfy the condition — verify the trigger fires and the task becomes actionable in Focus View.

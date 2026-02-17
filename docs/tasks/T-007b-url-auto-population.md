@@ -86,10 +86,20 @@ Split from T-007 (Task Intake). Requires T-007a (the intake form shell).
 11. **Graceful fallback**: When fetch fails, verify form remains usable with just the URL as a link.
 12. **Unknown repo**: URL from unassociated repo — verify project selector is not auto-filled.
 
+## E2E Testing
+
+At least one Playwright e2e test covering the core user flow. Uses the e2e helpers and patterns established in T-014.
+
+Since this feature depends on external CLI tools (`gh`, `az`) and LLM calls, the e2e test focuses on the graceful degradation path and the UI flow rather than actual metadata fetching.
+
+1. **Generic URL stored as link**: Open the intake form → paste a non-GitHub/Azure URL → verify the URL is added to the links section → submit → verify the created task has the URL as a link.
+2. **Loading state on recognized URL**: Paste a GitHub-shaped URL (the fetch will fail in test since `gh` won't be authed) → verify a loading indicator briefly appears → verify the form degrades gracefully to manual entry with the URL still stored as a link.
+
 ## Verification
 
 1. Run `npm run test` — URL intake tests pass.
-2. Run `npm run dev`:
+2. Run `npx playwright test e2e/url-auto-population.spec.ts` — e2e tests pass.
+3. Run `npm run dev`:
    - Paste a GitHub issue URL into the intake form.
    - Verify title and context auto-populate from metadata + LLM.
    - Verify project auto-matches if the repo is associated.

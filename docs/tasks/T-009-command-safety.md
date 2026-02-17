@@ -87,6 +87,10 @@ Test in the `node` Vitest project.
 - Add a section to `docs/ARCHITECTURE.md` describing the command safety system.
 - Document how to extend the allowlist/blocklist in `docs/references/` for future maintainers.
 
+## E2E Testing
+
+T-009 is backend-only logic with no direct UI. Its e2e coverage comes indirectly through T-011b (Agentic CLI), where command safety classification gates the approval flow in the chat interface. No standalone e2e test file is needed for this task.
+
 ## Verification
 
 1. Run `npm run test` — safety classification tests pass with 90%+ coverage on `src/main/safety/`.
