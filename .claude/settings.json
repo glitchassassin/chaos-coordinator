@@ -72,13 +72,12 @@
       {
         "hooks": [
           {
-            "type": "agent",
-            "prompt": "Verify that npm run lint and npm test pass. $ARGUMENTS",
-            "timeout": 120
+            "type": "command",
+            "command": "cd /Users/jon/repos/chaos-coordinator && npm run validate"
           },
           {
             "type": "agent",
-            "prompt": "If changes have been made and the task is complete, check if code-reviewer subagent has been invoked. If not, run it.",
+            "prompt": "If changes have been made and the task is complete, check if the code-reviewer agent has already been invoked in this session. If not, invoke it now using the Task tool with subagent_type='code-reviewer'. Do NOT use the Skill tool — code-reviewer is a Task subagent, not a skill.",
             "timeout": 600
           }
         ]
