@@ -533,6 +533,7 @@ export default function FocusView() {
           fromColumn={task.column}
           toColumn={captureState.toColumn}
           transitionType={captureState.type}
+          project={project}
           onConfirm={(contextBlock) => {
             void handleCaptureConfirm(contextBlock)
           }}

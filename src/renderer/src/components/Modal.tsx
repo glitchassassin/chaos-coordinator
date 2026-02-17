@@ -1,13 +1,20 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
 
 interface ModalProps {
   open: boolean
   onClose: () => void
   children: ReactNode
   className?: string
+  style?: CSSProperties
 }
 
-export default function Modal({ open, onClose, children, className = '' }: ModalProps) {
+export default function Modal({
+  open,
+  onClose,
+  children,
+  className = '',
+  style
+}: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null)
 
   // Focus the first focusable element only when the modal opens (not on every render)
@@ -80,7 +87,9 @@ export default function Modal({ open, onClose, children, className = '' }: Modal
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className={`rounded-xl bg-gray-900 shadow-xl ${className}`}>{children}</div>
+      <div className={`rounded-xl bg-gray-900 shadow-xl ${className}`} style={style}>
+        {children}
+      </div>
     </div>
   )
 }
