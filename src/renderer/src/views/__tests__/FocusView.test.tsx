@@ -144,10 +144,16 @@ describe('FocusView', () => {
         expect(screen.getByText('Implement new feature')).toBeInTheDocument()
       })
 
-      // Check card uses primary color border and accent color background
+      // Check card uses primary color border; background is now a semi-transparent overlay
+      // (the accent color moved to the outer view background)
       const card = screen.getByText('Implement new feature').closest('.border-2')
       expect(card).toHaveStyle({
-        borderColor: '#1e3a8a',
+        borderColor: '#1e3a8a'
+      })
+
+      // Check outer view uses accent color as its background
+      const view = screen.getByTestId('focus-view')
+      expect(view).toHaveStyle({
         backgroundColor: '#3b82f6'
       })
 

@@ -51,6 +51,12 @@ interface CaptureState {
   toColumn: TaskColumn | 'archive'
 }
 
+/** Convert a stored image path to a media:// URL served by the main process */
+function imageUrl(storedPath: string): string {
+  const filename = storedPath.split(/[/\\]/).pop() ?? storedPath
+  return `media://project-images/${filename}`
+}
+
 export default function FocusView() {
   const navigate = useNavigate()
   const [focusData, setFocusData] = useState<FocusData | null>(null)
@@ -299,15 +305,28 @@ export default function FocusView() {
 
   return (
     <div
-      className={`flex h-full flex-col bg-gray-900 transition-opacity duration-400 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}
+      data-testid="focus-view"
+      className={`relative flex h-full flex-col transition-opacity duration-400 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}
+      style={{ backgroundColor: project.colorAccent }}
     >
+      {/* Background image */}
+      {project.backgroundImage && (
+        <img
+          src={imageUrl(project.backgroundImage)}
+          alt=""
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-50"
+          onError={(e) => {
+            e.currentTarget.style.display = 'none'
+          }}
+        />
+      )}
       {/* Main content - centered with generous whitespace */}
-      <div className="flex flex-1 items-center justify-center px-16 py-12">
+      <div className="relative flex flex-1 items-center justify-center px-16 py-12">
         <div
           className="max-w-3xl space-y-6 rounded-xl border-2 p-8"
           style={{
             borderColor: project.colorPrimary,
-            backgroundColor: project.colorAccent,
+            backgroundColor: project.colorAccent + 'e6',
             color: accentTextColor
           }}
         >
@@ -489,7 +508,14 @@ export default function FocusView() {
       </div>
 
       {/* Ambient queue indicator */}
-      <div className="border-t border-gray-800 bg-gray-950 px-8 py-4 text-center text-sm text-gray-400">
+      <div
+        className="relative border-t px-8 py-4 text-center text-sm"
+        style={{
+          borderColor: accentTextColor === '#ffffff' ? '#ffffff20' : '#00000020',
+          backgroundColor: accentTextColor === '#ffffff' ? '#00000030' : '#ffffff30',
+          color: accentTextColor === '#ffffff' ? '#ffffffaa' : '#000000aa'
+        }}
+      >
         {queueDepth.actionable > 1 && (
           <span>{queueDepth.actionable - 1} tasks waiting</span>
         )}

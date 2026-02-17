@@ -3,8 +3,9 @@
 # - Runs lint + format check if any files changed (vs HEAD)
 # - Also runs tests only when app code changed
 #   (excludes docs/, CLAUDE.md, and .claude/ ritual files)
-
-set -e
+# Exit codes:
+#   0 = all good, allow stop
+#   2 = validation failed, block stop and resume agent with feedback
 
 cd "$(git rev-parse --show-toplevel)"
 
@@ -14,10 +15,21 @@ if [ -z "$CHANGED" ]; then
   exit 0
 fi
 
-npm run lint && npm run format:check
+if ! npm run lint; then
+  echo "Lint/typecheck failed — fix the errors above before stopping."
+  exit 2
+fi
+
+if ! npm run format:check; then
+  echo "Format check failed — run 'npm run format' to fix."
+  exit 2
+fi
 
 APP_CHANGED=$(echo "$CHANGED" | grep -vE '^(docs/|CLAUDE\.md|\.claude/)' || true)
 
 if [ -n "$APP_CHANGED" ]; then
-  npm run test
+  if ! npm run test; then
+    echo "Tests failed — fix the failing tests above before stopping."
+    exit 2
+  fi
 fi
