@@ -42,6 +42,25 @@ All standards are enforced by a 3-layer system. See ADR [008](docs/decisions/008
 - Data model changes go through Drizzle schema files — those are the canonical schema reference.
 - When you encounter a recurring pattern or solution worth standardizing, check `docs/references/` for existing guidance and add new entries there.
 
+## Logging
+
+Main-process code must use `createLogger(source)` from `src/main/debug` instead of `console.*`. See ADR [015](docs/decisions/015-main-process-logging.md) for rationale.
+
+```ts
+import { createLogger } from '../debug'
+const logger = createLogger('llm') // 'llm' | 'ipc' | 'db' | 'cli' | 'config' | 'app'
+logger.error('Generation failed', error) // → debug bus + console.error
+logger.warn('Retrying...') // → debug bus + console.warn
+logger.info('Request complete') // → debug bus only
+logger.debug('Token count', { n: 42 }) // → debug bus only
+```
+
+`warn`/`error` write to both the debug bus (visible in the Debug tab) and the real console (visible in devtools). `debug`/`info` go to the bus only.
+
+**Do not use `console.error` / `console.warn` directly in main-process code** — raw calls bypass the Debug tab. Renderer code may use `console.*` freely.
+
+Pending migration: `src/main/llm/service.ts`, `src/main/config/store.ts`, `src/main/ipc/projects.ts` still use raw `console.*` and should be converted when touched.
+
 ## Accessibility
 
 Keyboard accessibility is a priority. All interactive UI must be fully operable via keyboard.
