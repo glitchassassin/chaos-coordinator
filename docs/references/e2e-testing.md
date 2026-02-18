@@ -34,6 +34,7 @@ e2e/
   projects.spec.ts        — T-003: Project Management UI
   board-view.spec.ts      — T-005: Board View
   focus-view.spec.ts      — T-004 + T-001: Focus View + Priority Engine
+  context-capture.spec.ts — T-008: Context Capture (Shelving)
 ```
 
 ## Writing a New E2E Test
