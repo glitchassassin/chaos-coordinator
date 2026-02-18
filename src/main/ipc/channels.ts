@@ -17,5 +17,9 @@ export const Channels = {
   DialogOpenImage: 'dialog:open-image',
   ColorsExtractPalette: 'colors:extract-palette',
   FilesCopyToAppData: 'files:copy-to-app-data',
-  IntakeFetchMetadata: 'intake:fetchMetadata'
+  IntakeFetchMetadata: 'intake:fetchMetadata',
+  IntakeProcessTask: 'intake:processTask',
+  DebugSubscribe: 'debug:subscribe',
+  DebugUnsubscribe: 'debug:unsubscribe',
+  LlmValidateModel: 'llm:validateModel'
 } as const

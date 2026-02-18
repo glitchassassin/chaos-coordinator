@@ -15,6 +15,13 @@ import type {
   MaskedConfig,
   ConfigSchemaMetadata
 } from '../config/types'
+import type { DebugEvent, DebugEventType } from './debug'
+
+export const BOARD_PUSH_CHANNEL = 'board:taskUpdated' as const
+export interface BoardTaskUpdatedPayload {
+  taskId: number
+  success: boolean
+}
 
 export interface FocusResponse {
   task: Task | null
@@ -96,6 +103,10 @@ export interface IpcChannelMap {
       matchedProjectId: number | null
     } | null
   }
+  'intake:processTask': {
+    request: { url: string; taskId: number; projectId: number }
+    response: undefined
+  }
 
   'dialog:open-image': { request: undefined; response: string | null }
   'files:copy-to-app-data': {
@@ -105,6 +116,17 @@ export interface IpcChannelMap {
   'colors:extract-palette': {
     request: { imagePath: string }
     response: { colors: string[] }
+  }
+
+  'debug:subscribe': {
+    request: { types?: DebugEventType[] } | undefined
+    response: { events: DebugEvent[] }
+  }
+  'debug:unsubscribe': { request: undefined; response: undefined }
+
+  'llm:validateModel': {
+    request: { model: string }
+    response: { valid: boolean; error?: string }
   }
 }
 

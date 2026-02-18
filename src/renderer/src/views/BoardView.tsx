@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { BOARD_PUSH_CHANNEL } from '@shared/types/ipc'
 import type { Project, Task, Trigger, InsertTask, Link } from '@shared/types/models'
 import { TaskColumn, TriggerStatus } from '@shared/types/enums'
 import { timeElapsed } from '@shared/lib/time-utils'
@@ -76,21 +77,20 @@ export default function BoardView() {
 
   // Loading state for URL auto-population (renderer-only, no DB column needed)
   const [fetchingTaskIds, setFetchingTaskIds] = useState<Set<number>>(new Set())
-  const activeTaskIdsRef = useRef(new Set<number>())
+  // Tracks tasks cancelled by the user so stale push events don't show misleading toasts
+  const cancelledTaskIdsRef = useRef(new Set<number>())
 
-  const startFetching = (id: number) => {
-    activeTaskIdsRef.current.add(id)
+  const startFetching = useCallback((id: number) => {
     setFetchingTaskIds((prev) => new Set([...prev, id]))
-  }
+  }, [])
 
-  const stopFetching = (id: number) => {
-    activeTaskIdsRef.current.delete(id)
+  const stopFetching = useCallback((id: number) => {
     setFetchingTaskIds((prev) => {
       const next = new Set(prev)
       next.delete(id)
       return next
     })
-  }
+  }, [])
 
   // Drag state for cards
   const draggedCard = useRef<{ taskId: number } | null>(null)
@@ -148,6 +148,21 @@ export default function BoardView() {
   useEffect(() => {
     void loadBoard()
   }, [loadBoard])
+
+  useEffect(() => {
+    window.api.on(BOARD_PUSH_CHANNEL, ({ taskId, success }) => {
+      if (cancelledTaskIdsRef.current.has(taskId)) {
+        cancelledTaskIdsRef.current.delete(taskId)
+        return
+      }
+      stopFetching(taskId)
+      if (success) showToast('Task populated from URL', 'success')
+      void loadBoard()
+    })
+    return () => {
+      window.api.off(BOARD_PUSH_CHANNEL)
+    }
+  }, [loadBoard, showToast, stopFetching])
 
   useEffect(() => {
     if (editingTask) {
@@ -413,44 +428,17 @@ export default function BoardView() {
       return
     }
 
-    // Show loading state and reload so card appears
+    // Show loading state and reload so card appears immediately
     startFetching(task.id)
     await loadBoard()
 
-    try {
-      const result = await window.api.invoke('intake:fetchMetadata', { url })
-
-      // Drop result if user cancelled (task no longer in active set)
-      if (!activeTaskIdsRef.current.has(task.id)) return
-
-      if (result !== null) {
-        // Determine final projectId (auto-associate if repo matched)
-        const finalProjectId = result.matchedProjectId ?? projectId
-
-        await window.api.invoke('tasks:update', {
-          id: task.id,
-          title: result.title,
-          contextBlock: result.contextBlock || null,
-          projectId: finalProjectId
-        })
-        await window.api.invoke('links:create', {
-          taskId: task.id,
-          url,
-          sourceType: result.sourceType,
-          isPrimary: true
-        })
-        showToast('Task populated from URL', 'success')
-      }
-      // On null (failure): task keeps URL as title; it's already a normal task
-    } catch {
-      // On error: graceful degradation — card stays with URL as title
-    } finally {
-      stopFetching(task.id)
-      await loadBoard()
-    }
+    // Fire-and-forget: main process handles CLI fetch + DB updates.
+    // board:taskUpdated push event triggers stopFetching + loadBoard when done.
+    void window.api.invoke('intake:processTask', { url, taskId: task.id, projectId })
   }
 
   const handleCancelFetch = async (taskId: number) => {
+    cancelledTaskIdsRef.current.add(taskId)
     stopFetching(taskId)
     try {
       await window.api.invoke('tasks:archive', { id: taskId })

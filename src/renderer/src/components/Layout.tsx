@@ -5,7 +5,8 @@ const navItems = [
   { to: '/board', label: 'Board' },
   { to: '/archive', label: 'Archive' },
   { to: '/projects', label: 'Projects' },
-  { to: '/settings', label: 'Settings' }
+  { to: '/settings', label: 'Settings' },
+  { to: '/debug', label: 'Debug' }
 ] as const
 
 export default function Layout() {

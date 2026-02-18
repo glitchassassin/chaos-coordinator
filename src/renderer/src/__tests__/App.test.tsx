@@ -5,7 +5,9 @@ import App from '../App'
 
 // Mock window.api
 const mockApi = {
-  invoke: vi.fn()
+  invoke: vi.fn(),
+  on: vi.fn(),
+  off: vi.fn()
 }
 
 describe('App', () => {

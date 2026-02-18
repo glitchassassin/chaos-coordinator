@@ -75,6 +75,10 @@
 - CLI executor: `src/main/cli/executor.ts`
 - URL parser: `src/main/cli/urlParser.ts`
 - Intake IPC handler: `src/main/ipc/intake.ts`
+- Debug event bus: `src/main/debug/event-bus.ts` (singleton, ring buffer 1000)
+- Debug IPC instrumentation: `src/main/debug/ipc-instrumentation.ts` (monkey-patches ipcMain.handle)
+- Debug async tracking: `src/main/debug/async-instrumentation.ts` (trackAsync wrapper)
+- LLM model validation: `src/main/llm/validation.ts`
 
 ### Common Review Issues
 
@@ -96,4 +100,9 @@
 - **E2E url-auto-population.spec.ts**: Tests graceful degradation (gh not installed/authed), uses try/catch for timing-sensitive cancel button.
 - **intake.ts test pattern**: Captures IPC handler from `ipcMain.handle` mock, then invokes it directly via `call()` helper. 98.91% coverage.
 - **LLM prompt system/user message alignment**: Fixed in T-007b. General pattern to watch: ensure system and user prompts agree on output format (paragraph count, sentence count, etc.).
-- **Dual-tracking loading state pattern**: `fetchingTaskIds` (React state for UI) + `activeTaskIdsRef` (ref for cancel-detection) avoids stale-closure race when async fetch resolves after cancel. Good pattern to reference.
+- **Dual-tracking loading state pattern**: `fetchingTaskIds` (React state for UI) + `activeTaskIdsRef` (ref for cancel-detection) avoids stale-closure race when async fetch resolves after cancel. Pattern was removed in T-015 intake durability refactor -- replaced with fire-and-forget + push events. Cancel race condition introduced: main process still sends push event after renderer archives task.
+- **classifyError in validation.ts**: `lower.includes('not found')` is overly broad -- any error mentioning "not found" gets classified as "Model not found". Flagged in T-015 review.
+- **generateStructured wraps trackAsync per-call**: Creates new tracked fn on every invocation instead of once at module level. Pattern inconsistency flagged in T-015 review.
+- **Push event pattern**: Preload `on(channel, cb)` / `off(channel)` with `PushChannelMap` type. `off` calls `removeAllListeners`. Used for `board:taskUpdated` and `debug:event`.
+- **Channels constant inconsistency**: `llm.ts`, `debug.ts`, `config.ts` use string literals; `tasks.ts`, `projects.ts`, `links.ts`, `intake.ts`, `colors.ts`, `columnHistory.ts` use `Channels.X` constant. Pre-existing.
+- **ipc-instrumentation.ts has no tests**: Monkey-patches `ipcMain.handle`. 5.55% coverage as of T-015.

@@ -16,6 +16,7 @@ export default function SettingsView({ firstRun = false }: SettingsViewProps) {
   const [schema, setSchema] = useState<ConfigSchemaMetadata | null>(null)
   const [values, setValues] = useState<MaskedConfig>({})
   const [errors, setErrors] = useState<Partial<Record<ConfigKey, string>>>({})
+  const [validating, setValidating] = useState<Partial<Record<ConfigKey, boolean>>>({})
   const { toast, showToast } = useToast(2000)
 
   const loadSettings = useCallback(async () => {
@@ -51,6 +52,34 @@ export default function SettingsView({ firstRun = false }: SettingsViewProps) {
         setTimeout(() => {
           window.location.reload()
         }, 1500)
+        return
+      }
+
+      // Validate LLM connection when model or API key is saved (not during first-run)
+      if (key === 'llm.model' || key === 'llm.apiKey') {
+        const currentModel = key === 'llm.model' ? value : (values['llm.model'] ?? '')
+        if (currentModel) {
+          setValidating((prev) => ({ ...prev, 'llm.model': true }))
+          try {
+            const result = await window.api.invoke('llm:validateModel', {
+              model: currentModel
+            })
+            if (!result.valid) {
+              setErrors((prev) => ({
+                ...prev,
+                'llm.model': result.error ?? 'Model validation failed'
+              }))
+            } else {
+              setErrors((prev) => {
+                const next = { ...prev }
+                delete next['llm.model']
+                return next
+              })
+            }
+          } finally {
+            setValidating((prev) => ({ ...prev, 'llm.model': false }))
+          }
+        }
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to save'
@@ -109,6 +138,7 @@ export default function SettingsView({ firstRun = false }: SettingsViewProps) {
                     item={item}
                     value={val}
                     error={errors[item.key]}
+                    isValidating={validating[item.key] === true}
                     onSave={handleSave}
                     onReset={handleReset}
                   />
@@ -128,11 +158,19 @@ interface SettingFieldProps {
   item: ConfigKeyMeta
   value: string | undefined
   error: string | undefined
+  isValidating: boolean
   onSave: (key: ConfigKey, value: string) => Promise<void>
   onReset: (key: ConfigKey) => Promise<void>
 }
 
-function SettingField({ item, value, error, onSave, onReset }: SettingFieldProps) {
+function SettingField({
+  item,
+  value,
+  error,
+  isValidating,
+  onSave,
+  onReset
+}: SettingFieldProps) {
   const [inputValue, setInputValue] = useState<string>('')
   const [isDirty, setIsDirty] = useState(false)
 
@@ -241,7 +279,8 @@ function SettingField({ item, value, error, onSave, onReset }: SettingFieldProps
         />
       )}
       <p className="mt-1 text-xs text-gray-500">{item.description}</p>
-      {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
+      {isValidating && <p className="mt-1 text-xs text-blue-400">Validating model...</p>}
+      {!isValidating && error && <p className="mt-1 text-xs text-red-400">{error}</p>}
     </div>
   )
 }

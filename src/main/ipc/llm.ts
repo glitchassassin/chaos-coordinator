@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import { generate, generateStructured, getConfig } from '../llm'
+import { validateModel } from '../llm/validation'
 
 export function registerLLMHandlers() {
   // Generate text completion
@@ -49,5 +50,10 @@ export function registerLLMHandlers() {
     } catch {
       return { configured: false }
     }
+  })
+
+  // Validate model by making a minimal test call
+  ipcMain.handle('llm:validateModel', async (_, request: { model: string }) => {
+    return await validateModel(request.model)
   })
 }

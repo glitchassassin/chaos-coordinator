@@ -2,6 +2,7 @@ import { generateText, streamText } from 'ai'
 import type { ModelMessage } from 'ai'
 import { z } from 'zod'
 import { createProvider } from './provider'
+import { trackAsync } from '../debug'
 
 export interface GenerateTextOptions {
   system?: string
@@ -20,11 +21,7 @@ export interface StreamTextOptions {
   messages: ModelMessage[]
 }
 
-/**
- * Generate text completion using the configured LLM provider.
- * For one-shot completions without structured output.
- */
-export async function generate(options: GenerateTextOptions): Promise<string> {
+async function generateImpl(options: GenerateTextOptions): Promise<string> {
   try {
     const model = createProvider()
 
@@ -60,10 +57,16 @@ export async function generate(options: GenerateTextOptions): Promise<string> {
 }
 
 /**
- * Generate structured output using Zod schema validation.
- * Returns a typed object parsed from LLM response.
+ * Generate text completion using the configured LLM provider.
+ * For one-shot completions without structured output.
  */
-export async function generateStructured<T extends z.ZodType>(
+export const generate = trackAsync(
+  'llm:generate',
+  (options: GenerateTextOptions) => options.prompt.slice(0, 60),
+  generateImpl
+)
+
+async function generateStructuredImpl<T extends z.ZodType>(
   options: GenerateObjectOptions<T>
 ): Promise<z.infer<T>> {
   try {
@@ -98,6 +101,21 @@ export async function generateStructured<T extends z.ZodType>(
       `Failed to generate structured output: ${error instanceof Error ? error.message : 'Unknown error'}`
     )
   }
+}
+
+/**
+ * Generate structured output using Zod schema validation.
+ * Returns a typed object parsed from LLM response.
+ */
+export async function generateStructured<T extends z.ZodType>(
+  options: GenerateObjectOptions<T>
+): Promise<z.infer<T>> {
+  const tracked = trackAsync(
+    'llm:generateStructured',
+    (o: GenerateObjectOptions<T>) => o.prompt.slice(0, 60),
+    generateStructuredImpl<T>
+  )
+  return tracked(options)
 }
 
 /**

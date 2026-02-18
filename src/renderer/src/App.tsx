@@ -6,6 +6,7 @@ import BoardView from './views/BoardView'
 import ArchiveView from './views/ArchiveView'
 import ProjectsView from './views/ProjectsView'
 import SettingsView from './views/SettingsView'
+import DebugView from './views/DebugView'
 
 export default function App() {
   const [isConfigured, setIsConfigured] = useState<boolean | null>(null)
@@ -33,6 +34,7 @@ export default function App() {
         <Route element={<Layout />}>
           <Route path="*" element={<Navigate to="/settings" replace />} />
           <Route path="/settings" element={<SettingsView firstRun={true} />} />
+          <Route path="/debug" element={<DebugView />} />
         </Route>
       </Routes>
     )
@@ -47,6 +49,7 @@ export default function App() {
         <Route path="/archive" element={<ArchiveView />} />
         <Route path="/projects" element={<ProjectsView />} />
         <Route path="/settings" element={<SettingsView />} />
+        <Route path="/debug" element={<DebugView />} />
       </Route>
     </Routes>
   )

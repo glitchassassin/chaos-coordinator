@@ -4,6 +4,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc'
 import { runMigrations } from './db/migrate'
 import { configStore } from './config'
+import { installIpcInstrumentation } from './debug'
 
 // Test isolation: override userData path if env var is set.
 // Must be called before app.whenReady() so all subsequent app.getPath('userData')
@@ -71,6 +72,7 @@ void app.whenReady().then(() => {
 
   runMigrations()
   configStore.initialize()
+  installIpcInstrumentation()
   registerIpcHandlers()
   createWindow()
 

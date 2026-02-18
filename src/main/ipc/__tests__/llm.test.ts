@@ -22,6 +22,10 @@ vi.mock('../../llm/provider', () => ({
   getConfig: vi.fn()
 }))
 
+vi.mock('../../llm/validation', () => ({
+  validateModel: vi.fn()
+}))
+
 describe('LLM IPC Handlers', () => {
   let handlers: Map<string, (...args: unknown[]) => unknown>
 
