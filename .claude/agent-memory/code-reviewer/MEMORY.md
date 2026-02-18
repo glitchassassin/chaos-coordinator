@@ -16,9 +16,9 @@
 
 - Playwright config: `playwright.config.ts` (testDir: `./e2e`, 30s timeout, workers: 1)
 - Global setup: `e2e/global-setup.ts` rebuilds better-sqlite3 for Electron
-- E2E files: `app.spec.ts` (smoke), `board-view.spec.ts`, `focus-view.spec.ts`, `projects.spec.ts`, `settings.spec.ts`, `context-capture.spec.ts`
+- E2E files: `app.spec.ts` (smoke), `board-view.spec.ts`, `focus-view.spec.ts`, `projects.spec.ts`, `settings.spec.ts`, `context-capture.spec.ts`, `task-links.spec.ts`
 - Helpers: `e2e/helpers.ts` (launchApp, waitForReady, navigateTo, createTestDataDir, cleanupTestDataDir)
-- Seed utils: `e2e/seed.ts` (seedProject, seedTask, clearAllData via renderer IPC)
+- Seed utils: `e2e/seed.ts` (seedProject, seedTask, seedLink, clearAllProjects via renderer IPC)
 - Test isolation: each spec file gets its own Electron instance + temp userData dir
 - `clearAllData` only deletes projects; tasks survive with `projectId: null` due to `onDelete: 'set null'`. Works because views exclude unassigned tasks (inner join / projectId filter).
 - Navigation helper uses `waitForTimeout(300)` -- fixed delay
@@ -69,6 +69,8 @@
 - E2E helpers: `e2e/helpers.ts`, E2E seed: `e2e/seed.ts`, E2E guide: `docs/references/e2e-testing.md`
 - ContextCapture component: `src/renderer/src/components/ContextCapture.tsx`
 - ColumnHistory IPC handler: `src/main/ipc/columnHistory.ts`
+- Links IPC handler: `src/main/ipc/links.ts`
+- LinkIcon shared component: `src/renderer/src/components/LinkIcon.tsx`
 - react-markdown v10.1.0 used for rendering markdown in FocusView context block
 
 ### Common Review Issues
@@ -83,3 +85,5 @@
 - **ContextCapture useEffect deps**: The `[open]` dep array with eslint-disable is intentional -- avoids re-running LLM call when task/column props change after initial open
 - **No columnHistory record for archive transitions**: FocusView archive path saves context but skips columnHistory entry
 - **Double isTransitioning in defer+confirm**: `handleCaptureConfirm` sets transitioning, then defer branch calls `executeDeferTransition()` which also sets it
+- **copiedLinkId timer leak**: `handleCopyLink` uses `setTimeout(1500)` without cleanup -- if modal closes before timer fires, `setCopiedLinkId(null)` runs on unmounted/re-rendered state. Minor but worth noting.
+- **Deferred link deletion pattern**: Link removes are batched with Save (not immediate IPC). `removedLinkIds` tracks IDs; `editingLinks` removes from display. Cancel discards both.
