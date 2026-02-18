@@ -24,9 +24,11 @@ export default function DebugView() {
     window.location.reload()
   }
 
+  const asyncOpCount = new Set(asyncEvents.map((e) => e.operationId)).size
+
   const tabs: { id: Panel; label: string; count: number }[] = [
     { id: 'logs', label: 'Logs', count: logEvents.length },
-    { id: 'async', label: 'Async Tasks', count: asyncEvents.length },
+    { id: 'async', label: 'Async Tasks', count: asyncOpCount },
     { id: 'ipc', label: 'IPC Traffic', count: ipcEvents.length }
   ]
 
