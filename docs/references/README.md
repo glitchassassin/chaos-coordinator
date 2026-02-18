@@ -9,6 +9,4 @@ This directory contains standard patterns and solutions for recurring problems e
 
 ## Contents
 
-<!-- Add entries as patterns emerge during development -->
-
-_No entries yet. Add files here as standard patterns and recurring solutions are identified._
+- **[e2e-testing.md](e2e-testing.md)** — E2E testing patterns using Playwright with Electron integration, test data seeding, isolation strategy, and debugging techniques.
