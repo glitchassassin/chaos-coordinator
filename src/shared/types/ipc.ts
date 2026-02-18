@@ -5,6 +5,7 @@ import type {
   InsertTask,
   Trigger,
   Link,
+  InsertLink,
   ColumnHistory,
   InsertColumnHistory
 } from './models'
@@ -78,6 +79,10 @@ export interface IpcChannelMap {
   'config:getAll': { request: undefined; response: MaskedConfig }
   'config:getSchema': { request: undefined; response: ConfigSchemaMetadata }
   'config:reset': { request: { key: ConfigKey }; response: boolean }
+
+  'links:list': { request: { taskId: number }; response: Link[] }
+  'links:create': { request: InsertLink; response: Link }
+  'links:delete': { request: { id: number }; response: undefined }
 
   'columnHistory:create': { request: InsertColumnHistory; response: ColumnHistory }
 

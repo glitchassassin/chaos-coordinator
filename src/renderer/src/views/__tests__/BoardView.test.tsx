@@ -3,7 +3,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import userEvent from '@testing-library/user-event'
 import BoardView from '../BoardView'
-import type { Project, Task } from '../../../../shared/types/models'
+import type { Project, Task, Link } from '../../../../shared/types/models'
 import { TaskColumn } from '../../../../shared/types/enums'
 
 const mockProjects: Project[] = [
@@ -117,6 +117,23 @@ describe('BoardView', () => {
       }
       if (channel === 'columnHistory:create') {
         return Promise.resolve({ id: 1 })
+      }
+      if (channel === 'links:list') {
+        return Promise.resolve([])
+      }
+      if (channel === 'links:create') {
+        return Promise.resolve({
+          id: 1,
+          taskId: 2,
+          url: '',
+          label: null,
+          sourceType: 'other',
+          isPrimary: false,
+          createdAt: '2024-01-01'
+        })
+      }
+      if (channel === 'links:delete') {
+        return Promise.resolve(undefined)
       }
       return Promise.resolve(undefined)
     })
@@ -538,6 +555,7 @@ describe('BoardView', () => {
     mockApi.invoke.mockImplementation((channel: string) => {
       if (channel === 'projects:list') return Promise.resolve([...mockProjects])
       if (channel === 'tasks:list') return Promise.resolve([...mockTasks])
+      if (channel === 'links:list') return Promise.resolve([])
       if (channel === 'tasks:update') return Promise.reject(new Error('Update failed'))
       return Promise.resolve(undefined)
     })
@@ -586,6 +604,7 @@ describe('BoardView', () => {
     mockApi.invoke.mockImplementation((channel: string) => {
       if (channel === 'projects:list') return Promise.resolve([...mockProjects])
       if (channel === 'tasks:list') return Promise.resolve([...mockTasks])
+      if (channel === 'links:list') return Promise.resolve([])
       if (channel === 'tasks:archive') return Promise.reject(new Error('Archive failed'))
       return Promise.resolve(undefined)
     })
@@ -645,5 +664,219 @@ describe('BoardView', () => {
 
     const bgImgs = document.querySelectorAll('img.opacity-15')
     expect(bgImgs.length).toBe(0)
+  })
+
+  describe('links in edit modal', () => {
+    const mockExistingLinks: Link[] = [
+      {
+        id: 10,
+        taskId: 2,
+        url: 'https://github.com/org/repo/issues/1',
+        label: 'Issue #1',
+        sourceType: 'github_issue',
+        isPrimary: false,
+        createdAt: '2024-01-01'
+      }
+    ]
+
+    it('shows "Add link" button when task has no links', async () => {
+      render(<BoardView />)
+
+      await waitFor(() => screen.getByText('Task in Planning'))
+      fireEvent.click(screen.getByText('Task in Planning'))
+
+      await waitFor(() => {
+        expect(screen.getByText('+ Add link')).toBeInTheDocument()
+      })
+    })
+
+    it('copy button writes URL to clipboard and shows checkmark', async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined)
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText },
+        writable: true,
+        configurable: true
+      })
+
+      mockApi.invoke.mockImplementation((channel: string) => {
+        if (channel === 'projects:list') return Promise.resolve([...mockProjects])
+        if (channel === 'tasks:list') return Promise.resolve([...mockTasks])
+        if (channel === 'links:list') return Promise.resolve(mockExistingLinks)
+        return Promise.resolve(undefined)
+      })
+
+      render(<BoardView />)
+
+      await waitFor(() => screen.getByText('Task in Planning'))
+      fireEvent.click(screen.getByText('Task in Planning'))
+
+      await waitFor(() => screen.getByLabelText('Copy link Issue #1'))
+      fireEvent.click(screen.getByLabelText('Copy link Issue #1'))
+
+      await waitFor(() => {
+        expect(writeText).toHaveBeenCalledWith('https://github.com/org/repo/issues/1')
+      })
+    })
+
+    it('renders existing links as anchors when edit modal opens', async () => {
+      mockApi.invoke.mockImplementation((channel: string) => {
+        if (channel === 'projects:list') return Promise.resolve([...mockProjects])
+        if (channel === 'tasks:list') return Promise.resolve([...mockTasks])
+        if (channel === 'links:list') return Promise.resolve(mockExistingLinks)
+        return Promise.resolve(undefined)
+      })
+
+      render(<BoardView />)
+
+      await waitFor(() => screen.getByText('Task in Planning'))
+      fireEvent.click(screen.getByText('Task in Planning'))
+
+      await waitFor(() => {
+        const link = screen.getByRole('link', { name: 'Issue #1' })
+        expect(link).toBeInTheDocument()
+        expect(link).toHaveAttribute('href', 'https://github.com/org/repo/issues/1')
+      })
+    })
+
+    it('calls links:create with correct data when saving with a new link', async () => {
+      render(<BoardView />)
+
+      await waitFor(() => screen.getByText('Task in Planning'))
+      fireEvent.click(screen.getByText('Task in Planning'))
+
+      await waitFor(() => screen.getByText('+ Add link'))
+      fireEvent.click(screen.getByText('+ Add link'))
+
+      const urlInput = screen.getByLabelText('Link URL')
+      const labelInput = screen.getByLabelText('Link label')
+      fireEvent.change(urlInput, { target: { value: 'https://example.com' } })
+      fireEvent.change(labelInput, { target: { value: 'My Link' } })
+
+      fireEvent.click(screen.getByText('Save'))
+
+      await waitFor(() => {
+        expect(mockApi.invoke).toHaveBeenCalledWith('links:create', {
+          taskId: 2,
+          url: 'https://example.com',
+          label: 'My Link',
+          sourceType: 'other'
+        })
+      })
+    })
+
+    it('removes link from UI on remove click (deferred — no IPC until Save)', async () => {
+      mockApi.invoke.mockImplementation((channel: string) => {
+        if (channel === 'projects:list') return Promise.resolve([...mockProjects])
+        if (channel === 'tasks:list') return Promise.resolve([...mockTasks])
+        if (channel === 'links:list') return Promise.resolve(mockExistingLinks)
+        return Promise.resolve(undefined)
+      })
+
+      render(<BoardView />)
+
+      await waitFor(() => screen.getByText('Task in Planning'))
+      fireEvent.click(screen.getByText('Task in Planning'))
+
+      await waitFor(() => screen.getByText('Issue #1'))
+
+      fireEvent.click(screen.getByLabelText('Remove link Issue #1'))
+
+      // Link is gone from UI immediately
+      expect(screen.queryByText('Issue #1')).not.toBeInTheDocument()
+      // But IPC not called yet
+      expect(mockApi.invoke).not.toHaveBeenCalledWith('links:delete', expect.anything())
+    })
+
+    it('calls links:delete on Save after removing an existing link', async () => {
+      mockApi.invoke.mockImplementation((channel: string) => {
+        if (channel === 'projects:list') return Promise.resolve([...mockProjects])
+        if (channel === 'tasks:list') return Promise.resolve([...mockTasks])
+        if (channel === 'links:list') return Promise.resolve(mockExistingLinks)
+        if (channel === 'links:delete') return Promise.resolve(undefined)
+        if (channel === 'tasks:update') return Promise.resolve(mockTasks[0]!)
+        return Promise.resolve(undefined)
+      })
+
+      render(<BoardView />)
+
+      await waitFor(() => screen.getByText('Task in Planning'))
+      fireEvent.click(screen.getByText('Task in Planning'))
+
+      await waitFor(() => screen.getByText('Issue #1'))
+
+      fireEvent.click(screen.getByLabelText('Remove link Issue #1'))
+      fireEvent.click(screen.getByText('Save'))
+
+      await waitFor(() => {
+        expect(mockApi.invoke).toHaveBeenCalledWith('links:delete', { id: 10 })
+      })
+    })
+
+    it('does not call links:delete when Cancel is clicked after removing a link', async () => {
+      mockApi.invoke.mockImplementation((channel: string) => {
+        if (channel === 'projects:list') return Promise.resolve([...mockProjects])
+        if (channel === 'tasks:list') return Promise.resolve([...mockTasks])
+        if (channel === 'links:list') return Promise.resolve(mockExistingLinks)
+        return Promise.resolve(undefined)
+      })
+
+      render(<BoardView />)
+
+      await waitFor(() => screen.getByText('Task in Planning'))
+      fireEvent.click(screen.getByText('Task in Planning'))
+
+      await waitFor(() => screen.getByText('Issue #1'))
+
+      fireEvent.click(screen.getByLabelText('Remove link Issue #1'))
+
+      const cancelButton = screen
+        .getAllByText('Cancel')
+        .find((el) => el.closest('.fixed') !== null)
+      fireEvent.click(cancelButton!)
+
+      expect(mockApi.invoke).not.toHaveBeenCalledWith('links:delete', expect.anything())
+    })
+
+    it('removes pending link row without calling IPC', async () => {
+      render(<BoardView />)
+
+      await waitFor(() => screen.getByText('Task in Planning'))
+      fireEvent.click(screen.getByText('Task in Planning'))
+
+      await waitFor(() => screen.getByText('+ Add link'))
+      fireEvent.click(screen.getByText('+ Add link'))
+
+      expect(screen.getByLabelText('Link URL')).toBeInTheDocument()
+
+      fireEvent.click(screen.getByLabelText('Remove new link 1'))
+
+      expect(screen.queryByLabelText('Link URL')).not.toBeInTheDocument()
+      expect(mockApi.invoke).not.toHaveBeenCalledWith('links:delete', expect.anything())
+    })
+
+    it('link inputs and add/remove buttons are focusable', async () => {
+      render(<BoardView />)
+
+      await waitFor(() => screen.getByText('Task in Planning'))
+      fireEvent.click(screen.getByText('Task in Planning'))
+
+      await waitFor(() => screen.getByText('+ Add link'))
+      fireEvent.click(screen.getByText('+ Add link'))
+
+      const urlInput = screen.getByLabelText('Link URL')
+      const labelInput = screen.getByLabelText('Link label')
+      const removeButton = screen.getByLabelText('Remove new link 1')
+      const addLinkButton = screen.getByText('+ Add link')
+
+      expect(urlInput).toBeInTheDocument()
+      expect(labelInput).toBeInTheDocument()
+      expect(removeButton).toBeInTheDocument()
+      expect(addLinkButton).toBeInTheDocument()
+
+      // Verify all interactive elements are focusable (tabindex not set to -1)
+      expect(urlInput).not.toHaveAttribute('tabindex', '-1')
+      expect(labelInput).not.toHaveAttribute('tabindex', '-1')
+      expect(removeButton).not.toHaveAttribute('tabindex', '-1')
+    })
   })
 })

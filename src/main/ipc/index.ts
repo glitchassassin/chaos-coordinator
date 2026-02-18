@@ -4,6 +4,7 @@ import { registerColumnHistoryHandlers } from './columnHistory'
 import { registerLLMHandlers } from './llm'
 import { registerConfigHandlers } from './config'
 import { registerColorHandlers } from './colors'
+import { registerLinksHandlers } from './links'
 
 export function registerIpcHandlers() {
   registerProjectHandlers()
@@ -12,4 +13,5 @@ export function registerIpcHandlers() {
   registerLLMHandlers()
   registerConfigHandlers()
   registerColorHandlers()
+  registerLinksHandlers()
 }

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { Project, Task, Trigger, InsertTask } from '@shared/types/models'
+import type { Project, Task, Trigger, InsertTask, Link } from '@shared/types/models'
 import { TaskColumn, TriggerStatus } from '@shared/types/enums'
 import { timeElapsed } from '@shared/lib/time-utils'
 import Modal from '../components/Modal'
 import ContextCapture from '../components/ContextCapture'
 import ToastNotification from '../components/Toast'
 import { useToast } from '../hooks/useToast'
+import LinkIcon from '../components/LinkIcon'
 
 /** Convert a stored image path to a media:// URL served by the main process */
 function imageUrl(storedPath: string): string {
@@ -55,6 +56,12 @@ function isRecentlyFired(trigger: Trigger | null): boolean {
 export default function BoardView() {
   const [swimLanes, setSwimLanes] = useState<SwimLane[]>([])
   const [editingTask, setEditingTask] = useState<TaskWithTrigger | null>(null)
+  const [editingLinks, setEditingLinks] = useState<Link[]>([])
+  const [removedLinkIds, setRemovedLinkIds] = useState<number[]>([])
+  const [pendingLinks, setPendingLinks] = useState<{ url: string; label: string }[]>([])
+  const [copiedLinkId, setCopiedLinkId] = useState<number | null>(null)
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout>>(null)
+  const lastUrlInputRef = useRef<HTMLInputElement>(null)
   const [addingIn, setAddingIn] = useState<{
     projectId: number
     column: TaskColumn
@@ -119,6 +126,53 @@ export default function BoardView() {
   useEffect(() => {
     void loadBoard()
   }, [loadBoard])
+
+  useEffect(() => {
+    if (editingTask) {
+      void window.api
+        .invoke('links:list', { taskId: editingTask.task.id })
+        .then((result) => {
+          setEditingLinks(result)
+        })
+        .catch(() => {
+          // silently ignore — links section shows empty
+        })
+      setRemovedLinkIds([])
+      setPendingLinks([])
+      setCopiedLinkId(null)
+    } else {
+      setEditingLinks([])
+      setRemovedLinkIds([])
+      setPendingLinks([])
+      setCopiedLinkId(null)
+    }
+  }, [editingTask])
+
+  useEffect(() => {
+    if (pendingLinks.length > 0) {
+      lastUrlInputRef.current?.focus()
+    }
+  }, [pendingLinks.length])
+
+  const handleRemoveLink = (linkId: number) => {
+    setEditingLinks((prev) => prev.filter((l) => l.id !== linkId))
+    setRemovedLinkIds((prev) => [...prev, linkId])
+  }
+
+  const handleCopyLink = (link: Link) => {
+    void navigator.clipboard
+      .writeText(link.url)
+      .then(() => {
+        setCopiedLinkId(link.id)
+        if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+        copyTimerRef.current = setTimeout(() => {
+          setCopiedLinkId(null)
+        }, 1500)
+      })
+      .catch(() => {
+        // clipboard access denied — silently ignore
+      })
+  }
 
   const handleCardDragStart = (e: React.DragEvent, taskId: number) => {
     e.stopPropagation()
@@ -246,6 +300,21 @@ export default function BoardView() {
     if (!editingTask) return
 
     try {
+      await Promise.all(
+        removedLinkIds.map((id) => window.api.invoke('links:delete', { id }))
+      )
+      await Promise.all(
+        pendingLinks
+          .filter((l) => l.url.trim())
+          .map((l) =>
+            window.api.invoke('links:create', {
+              taskId: editingTask.task.id,
+              url: l.url.trim(),
+              label: l.label.trim() || null,
+              sourceType: 'other'
+            })
+          )
+      )
       await window.api.invoke('tasks:update', {
         id: editingTask.task.id,
         title: editingTask.task.title,
@@ -533,6 +602,130 @@ export default function BoardView() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Links */}
+            <div>
+              <div className="mb-2 text-sm font-medium text-gray-300">Links</div>
+              <div className="space-y-2">
+                {editingLinks.map((link) => (
+                  <div key={link.id} className="flex items-center gap-2">
+                    <span className="text-gray-500">
+                      <LinkIcon sourceType={link.sourceType} />
+                    </span>
+                    <a
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="min-w-0 flex-1 truncate text-sm text-indigo-400 hover:text-indigo-300 hover:underline"
+                    >
+                      {link.label ?? link.url}
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleCopyLink(link)
+                      }}
+                      aria-label={`Copy link ${link.label ?? link.url}`}
+                      className="shrink-0 text-gray-500 transition-colors hover:text-gray-300"
+                    >
+                      {copiedLinkId === link.id ? (
+                        <svg
+                          className="h-3.5 w-3.5 text-green-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      ) : (
+                        <svg
+                          className="h-3.5 w-3.5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                          />
+                        </svg>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleRemoveLink(link.id)
+                      }}
+                      aria-label={`Remove link ${link.label ?? link.url}`}
+                      className="shrink-0 text-gray-500 transition-colors hover:text-red-400"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                {pendingLinks.map((link, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input
+                      ref={i === pendingLinks.length - 1 ? lastUrlInputRef : null}
+                      type="url"
+                      value={link.url}
+                      onChange={(e) => {
+                        setPendingLinks((prev) =>
+                          prev.map((l, j) =>
+                            j === i ? { ...l, url: e.target.value } : l
+                          )
+                        )
+                      }}
+                      placeholder="https://..."
+                      aria-label="Link URL"
+                      className="flex-1 rounded border border-gray-700 bg-gray-800 px-2 py-1 text-sm text-gray-100 focus:border-indigo-500 focus:outline-none"
+                    />
+                    <input
+                      type="text"
+                      value={link.label}
+                      onChange={(e) => {
+                        setPendingLinks((prev) =>
+                          prev.map((l, j) =>
+                            j === i ? { ...l, label: e.target.value } : l
+                          )
+                        )
+                      }}
+                      placeholder="Label (optional)"
+                      aria-label="Link label"
+                      className="w-32 rounded border border-gray-700 bg-gray-800 px-2 py-1 text-sm text-gray-100 focus:border-indigo-500 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPendingLinks((prev) => prev.filter((_, j) => j !== i))
+                      }}
+                      aria-label={`Remove new link ${String(i + 1)}`}
+                      className="shrink-0 text-gray-500 transition-colors hover:text-red-400"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingLinks((prev) => [...prev, { url: '', label: '' }])
+                }}
+                className="mt-2 text-sm text-indigo-400 transition-colors hover:text-indigo-300"
+              >
+                + Add link
+              </button>
             </div>
 
             <div className="flex items-center justify-between pt-2">

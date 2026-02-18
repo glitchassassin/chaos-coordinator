@@ -1,7 +1,7 @@
 ---
 id: T-007a
 title: 'Task Edit — Links Support'
-status: ready
+status: done
 priority: 3
 dependencies: []
 spec_refs: ['§4.1']

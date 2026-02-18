@@ -11,6 +11,9 @@ export const Channels = {
   TasksArchive: 'tasks:archive',
   TasksFocus: 'tasks:focus',
   ColumnHistoryCreate: 'columnHistory:create',
+  LinksList: 'links:list',
+  LinksCreate: 'links:create',
+  LinksDelete: 'links:delete',
   DialogOpenImage: 'dialog:open-image',
   ColorsExtractPalette: 'colors:extract-palette',
   FilesCopyToAppData: 'files:copy-to-app-data'

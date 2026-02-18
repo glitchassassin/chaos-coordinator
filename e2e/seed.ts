@@ -38,6 +38,16 @@ export interface SeededTask {
   updatedAt: string
 }
 
+export interface SeededLink {
+  id: number
+  taskId: number
+  url: string
+  label: string | null
+  sourceType: string
+  isPrimary: boolean
+  createdAt: string
+}
+
 // ---------------------------------------------------------------------------
 // Seed helpers
 // ---------------------------------------------------------------------------
@@ -85,6 +95,27 @@ export async function seedTask(
       ...d
     })
   }, data) as Promise<SeededTask>
+}
+
+/**
+ * Create a link via IPC and return the created record.
+ */
+export async function seedLink(
+  window: Page,
+  data: {
+    taskId: number
+    url: string
+    label?: string | null
+    sourceType?: 'github_issue' | 'github_pr' | 'azure_devops' | 'other'
+  }
+): Promise<SeededLink> {
+  return window.evaluate(async (d) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (window as any).api.invoke('links:create', {
+      sourceType: 'other',
+      ...d
+    })
+  }, data) as Promise<SeededLink>
 }
 
 /**
