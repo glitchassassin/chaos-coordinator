@@ -1,7 +1,7 @@
 ---
 id: T-007b
 title: 'URL-based Auto-population'
-status: ready
+status: done
 priority: 3
 dependencies: ['T-002', 'T-007a']
 spec_refs: ['§4.1', '§4.2']

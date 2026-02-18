@@ -5,6 +5,7 @@ import { registerLLMHandlers } from './llm'
 import { registerConfigHandlers } from './config'
 import { registerColorHandlers } from './colors'
 import { registerLinksHandlers } from './links'
+import { registerIntakeHandlers } from './intake'
 
 export function registerIpcHandlers() {
   registerProjectHandlers()
@@ -14,4 +15,5 @@ export function registerIpcHandlers() {
   registerConfigHandlers()
   registerColorHandlers()
   registerLinksHandlers()
+  registerIntakeHandlers()
 }

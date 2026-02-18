@@ -72,6 +72,9 @@
 - Links IPC handler: `src/main/ipc/links.ts`
 - LinkIcon shared component: `src/renderer/src/components/LinkIcon.tsx`
 - react-markdown v10.1.0 used for rendering markdown in FocusView context block
+- CLI executor: `src/main/cli/executor.ts`
+- URL parser: `src/main/cli/urlParser.ts`
+- Intake IPC handler: `src/main/ipc/intake.ts`
 
 ### Common Review Issues
 
@@ -87,3 +90,10 @@
 - **Double isTransitioning in defer+confirm**: `handleCaptureConfirm` sets transitioning, then defer branch calls `executeDeferTransition()` which also sets it
 - **copiedLinkId timer leak**: `handleCopyLink` uses `setTimeout(1500)` without cleanup -- if modal closes before timer fires, `setCopiedLinkId(null)` runs on unmounted/re-rendered state. Minor but worth noting.
 - **Deferred link deletion pattern**: Link removes are batched with Save (not immediate IPC). `removedLinkIds` tracks IDs; `editingLinks` removes from display. Cancel discards both.
+- **Azure CLI `--org` flag requires full URL**: `az boards work-item show --org` needs `https://dev.azure.com/OrgName/`, not just the org name. Also `--project` is not a valid flag for `show`. (Fixed in T-007b post-review.)
+- **Generic URL auto-populate creates link + calls tasks:update**: For "other" type URLs, intake returns non-null with URL as title, so renderer still calls tasks:update (no-op) and links:create. This is by design for consistency.
+- **BoardView.url-populate.test.tsx**: Separate test file for URL auto-population flow -- uses `setupDefaultMocks` helper with `fetchMetadataResult` option, `allInvokes` array for async-safe assertion tracking.
+- **E2E url-auto-population.spec.ts**: Tests graceful degradation (gh not installed/authed), uses try/catch for timing-sensitive cancel button.
+- **intake.ts test pattern**: Captures IPC handler from `ipcMain.handle` mock, then invokes it directly via `call()` helper. 98.91% coverage.
+- **LLM prompt system/user message alignment**: Fixed in T-007b. General pattern to watch: ensure system and user prompts agree on output format (paragraph count, sentence count, etc.).
+- **Dual-tracking loading state pattern**: `fetchingTaskIds` (React state for UI) + `activeTaskIdsRef` (ref for cancel-detection) avoids stale-closure race when async fetch resolves after cancel. Good pattern to reference.

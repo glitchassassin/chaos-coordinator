@@ -86,6 +86,17 @@ export interface IpcChannelMap {
 
   'columnHistory:create': { request: InsertColumnHistory; response: ColumnHistory }
 
+  'intake:fetchMetadata': {
+    request: { url: string }
+    response: {
+      title: string
+      contextBlock: string
+      sourceType: Link['sourceType']
+      repoKey: string | null
+      matchedProjectId: number | null
+    } | null
+  }
+
   'dialog:open-image': { request: undefined; response: string | null }
   'files:copy-to-app-data': {
     request: { sourcePath: string }

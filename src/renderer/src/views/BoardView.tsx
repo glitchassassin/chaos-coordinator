@@ -8,6 +8,10 @@ import ToastNotification from '../components/Toast'
 import { useToast } from '../hooks/useToast'
 import LinkIcon from '../components/LinkIcon'
 
+function isUrl(value: string): boolean {
+  return value.startsWith('http://') || value.startsWith('https://')
+}
+
 /** Convert a stored image path to a media:// URL served by the main process */
 function imageUrl(storedPath: string): string {
   const filename = storedPath.split(/[/\\]/).pop() ?? storedPath
@@ -69,6 +73,24 @@ export default function BoardView() {
   const [addTitle, setAddTitle] = useState('')
   const addInputRef = useRef<HTMLInputElement>(null)
   const { toast, showToast } = useToast()
+
+  // Loading state for URL auto-population (renderer-only, no DB column needed)
+  const [fetchingTaskIds, setFetchingTaskIds] = useState<Set<number>>(new Set())
+  const activeTaskIdsRef = useRef(new Set<number>())
+
+  const startFetching = (id: number) => {
+    activeTaskIdsRef.current.add(id)
+    setFetchingTaskIds((prev) => new Set([...prev, id]))
+  }
+
+  const stopFetching = (id: number) => {
+    activeTaskIdsRef.current.delete(id)
+    setFetchingTaskIds((prev) => {
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
+  }
 
   // Drag state for cards
   const draggedCard = useRef<{ taskId: number } | null>(null)
@@ -357,19 +379,84 @@ export default function BoardView() {
   const handleInlineAdd = async () => {
     if (!addTitle.trim() || !addingIn) return
 
-    try {
-      const data: InsertTask = {
-        title: addTitle.trim(),
-        projectId: addingIn.projectId,
-        column: addingIn.column
+    const title = addTitle.trim()
+    const { projectId, column } = addingIn
+
+    setAddingIn(null)
+    setAddTitle('')
+
+    if (isUrl(title)) {
+      await handleUrlAutoPopulate(title, projectId, column)
+    } else {
+      try {
+        const data: InsertTask = { title, projectId, column }
+        await window.api.invoke('tasks:create', data)
+        showToast('Task created', 'success')
+        await loadBoard()
+      } catch {
+        showToast('Failed to create task', 'error')
       }
-      await window.api.invoke('tasks:create', data)
-      showToast('Task created', 'success')
-      setAddingIn(null)
-      setAddTitle('')
-      await loadBoard()
+    }
+  }
+
+  const handleUrlAutoPopulate = async (
+    url: string,
+    projectId: number,
+    column: TaskColumn
+  ) => {
+    // Create task immediately with URL as title
+    let task: Task
+    try {
+      task = await window.api.invoke('tasks:create', { title: url, projectId, column })
     } catch {
       showToast('Failed to create task', 'error')
+      return
+    }
+
+    // Show loading state and reload so card appears
+    startFetching(task.id)
+    await loadBoard()
+
+    try {
+      const result = await window.api.invoke('intake:fetchMetadata', { url })
+
+      // Drop result if user cancelled (task no longer in active set)
+      if (!activeTaskIdsRef.current.has(task.id)) return
+
+      if (result !== null) {
+        // Determine final projectId (auto-associate if repo matched)
+        const finalProjectId = result.matchedProjectId ?? projectId
+
+        await window.api.invoke('tasks:update', {
+          id: task.id,
+          title: result.title,
+          contextBlock: result.contextBlock || null,
+          projectId: finalProjectId
+        })
+        await window.api.invoke('links:create', {
+          taskId: task.id,
+          url,
+          sourceType: result.sourceType,
+          isPrimary: true
+        })
+        showToast('Task populated from URL', 'success')
+      }
+      // On null (failure): task keeps URL as title; it's already a normal task
+    } catch {
+      // On error: graceful degradation — card stays with URL as title
+    } finally {
+      stopFetching(task.id)
+      await loadBoard()
+    }
+  }
+
+  const handleCancelFetch = async (taskId: number) => {
+    stopFetching(taskId)
+    try {
+      await window.api.invoke('tasks:archive', { id: taskId })
+      await loadBoard()
+    } catch {
+      showToast('Failed to cancel', 'error')
     }
   }
 
@@ -456,16 +543,20 @@ export default function BoardView() {
                       onDrop={(e) => {
                         handleCardDrop(e)
                       }}
-                      className="flex min-h-[60px] flex-col rounded-lg border border-dashed border-gray-800 p-2"
+                      className="flex min-h-[60px] min-w-0 flex-col rounded-lg border border-dashed border-gray-800 p-2"
                     >
                       <div className="flex-1 space-y-2">
                         {lane.tasks[col.key].map((taskWithTrigger) => (
                           <TaskCard
                             key={taskWithTrigger.task.id}
                             taskWithTrigger={taskWithTrigger}
+                            isLoading={fetchingTaskIds.has(taskWithTrigger.task.id)}
                             onDragStart={handleCardDragStart}
                             onDragEnd={handleCardDragEnd}
                             onClick={handleCardClick}
+                            onCancel={(taskId) => {
+                              void handleCancelFetch(taskId)
+                            }}
                           />
                         ))}
                       </div>
@@ -787,13 +878,52 @@ export default function BoardView() {
 
 interface TaskCardProps {
   taskWithTrigger: TaskWithTrigger
+  isLoading: boolean
   onDragStart: (e: React.DragEvent, taskId: number) => void
   onDragEnd: (e: React.DragEvent) => void
   onClick: (taskWithTrigger: TaskWithTrigger) => void
+  onCancel: (taskId: number) => void
 }
 
-function TaskCard({ taskWithTrigger, onDragStart, onDragEnd, onClick }: TaskCardProps) {
+function TaskCard({
+  taskWithTrigger,
+  isLoading,
+  onDragStart,
+  onDragEnd,
+  onClick,
+  onCancel
+}: TaskCardProps) {
   const { task, trigger } = taskWithTrigger
+
+  // Loading state: show spinner overlay, disable interaction
+  if (isLoading) {
+    return (
+      <div className="relative rounded-lg border border-gray-700 bg-gray-900 p-3 opacity-60">
+        <div className="mb-2 truncate text-sm font-medium text-gray-400">
+          {task.title}
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <span
+              className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-gray-600 border-t-indigo-400"
+              aria-label="Loading"
+            />
+            <span>Fetching metadata…</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              onCancel(task.id)
+            }}
+            aria-label="Cancel fetch"
+            className="text-xs text-gray-500 transition-colors hover:text-gray-300"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   // Check if task is waiting (has active trigger)
   const isWaiting =
@@ -831,7 +961,9 @@ function TaskCard({ taskWithTrigger, onDragStart, onDragEnd, onClick }: TaskCard
       }`}
     >
       {/* Title */}
-      <div className="mb-2 text-sm font-medium text-gray-200">{task.title}</div>
+      <div className="mb-2 line-clamp-3 text-sm font-medium [overflow-wrap:anywhere] text-gray-200">
+        {task.title}
+      </div>
 
       {/* Waiting indicator */}
       {isWaiting && (

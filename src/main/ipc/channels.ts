@@ -16,5 +16,6 @@ export const Channels = {
   LinksDelete: 'links:delete',
   DialogOpenImage: 'dialog:open-image',
   ColorsExtractPalette: 'colors:extract-palette',
-  FilesCopyToAppData: 'files:copy-to-app-data'
+  FilesCopyToAppData: 'files:copy-to-app-data',
+  IntakeFetchMetadata: 'intake:fetchMetadata'
 } as const
