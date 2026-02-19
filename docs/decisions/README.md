@@ -22,6 +22,7 @@ This directory contains Architecture Decision Records (ADRs) documenting signifi
 | 012 | [Pre-push test gate for agent feedback](012-pre-push-test-gate.md)             | Superseded |
 | 013 | [Automated task pipeline via Claude Code CLI](013-auto-task-pipeline.md)       | Accepted   |
 | 014 | [Intelligent stop hooks for quality gates](014-intelligent-stop-hooks.md)      | Accepted   |
+| 015 | [Main process logging strategy](015-main-process-logging.md)                   | Accepted   |
 
 ## Format
 
