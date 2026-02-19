@@ -118,6 +118,51 @@ export async function seedLink(
   }, data) as Promise<SeededLink>
 }
 
+export interface SeededColumnHistory {
+  id: number
+  taskId: number
+  fromColumn: string | null
+  toColumn: string
+  contextSnapshot: string | null
+  movedAt: string
+}
+
+/**
+ * Create a task and immediately archive it, returning the archived record.
+ */
+export async function seedArchivedTask(
+  window: Page,
+  data: {
+    title: string
+    projectId?: number | null
+    contextBlock?: string
+  }
+): Promise<SeededTask> {
+  const task = await seedTask(window, { ...data, column: 'review' })
+  return window.evaluate(async (id) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (window as any).api.invoke('tasks:archive', { id })
+  }, task.id) as Promise<SeededTask>
+}
+
+/**
+ * Create a column history entry via IPC.
+ */
+export async function seedColumnHistory(
+  window: Page,
+  data: {
+    taskId: number
+    toColumn: 'backlog' | 'planning' | 'in_progress' | 'review'
+    fromColumn?: 'backlog' | 'planning' | 'in_progress' | 'review' | null
+    contextSnapshot?: string | null
+  }
+): Promise<SeededColumnHistory> {
+  return window.evaluate(async (d) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (window as any).api.invoke('columnHistory:create', d)
+  }, data) as Promise<SeededColumnHistory>
+}
+
 /**
  * Delete all projects for a clean slate between tests.
  *

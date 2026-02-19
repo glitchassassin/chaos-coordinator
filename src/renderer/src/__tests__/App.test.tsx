@@ -91,7 +91,7 @@ describe('App', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('Archive View')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Archive' })).toBeInTheDocument()
     })
   })
 })

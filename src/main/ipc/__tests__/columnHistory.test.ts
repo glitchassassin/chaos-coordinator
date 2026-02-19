@@ -19,14 +19,10 @@ vi.mock('electron', () => ({
 
 // Mock database
 const mockGet = vi.fn()
+const mockAll = vi.fn()
 const mockDb = {
-  insert: vi.fn().mockReturnValue({
-    values: vi.fn().mockReturnValue({
-      returning: vi.fn().mockReturnValue({
-        get: mockGet
-      })
-    })
-  })
+  insert: vi.fn(),
+  select: vi.fn()
 }
 
 vi.mock('../../db', () => ({
@@ -37,13 +33,29 @@ vi.mock('../../db/schema', () => ({
   columnHistory: {}
 }))
 
+vi.mock('drizzle-orm', () => ({
+  eq: vi.fn(),
+  asc: vi.fn()
+}))
+
 describe('ColumnHistory IPC Handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+
     mockDb.insert.mockReturnValue({
       values: vi.fn().mockReturnValue({
         returning: vi.fn().mockReturnValue({
           get: mockGet
+        })
+      })
+    })
+
+    mockDb.select.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          orderBy: vi.fn().mockReturnValue({
+            all: mockAll
+          })
         })
       })
     })
@@ -53,6 +65,14 @@ describe('ColumnHistory IPC Handlers', () => {
     registerColumnHistoryHandlers()
     expect(ipcMain.handle).toHaveBeenCalledWith(
       Channels.ColumnHistoryCreate,
+      expect.any(Function)
+    )
+  })
+
+  it('registers the columnHistory:list handler', () => {
+    registerColumnHistoryHandlers()
+    expect(ipcMain.handle).toHaveBeenCalledWith(
+      Channels.ColumnHistoryList,
       expect.any(Function)
     )
   })
@@ -117,5 +137,39 @@ describe('ColumnHistory IPC Handlers', () => {
     )) as ColumnHistory
 
     expect(result).toEqual(mockRecord)
+  })
+
+  it('lists column history for a given taskId in chronological order', async () => {
+    const mockRecords: ColumnHistory[] = [
+      {
+        id: 1,
+        taskId: 42,
+        fromColumn: null,
+        toColumn: TaskColumn.Planning,
+        contextSnapshot: null,
+        movedAt: '2024-01-01T10:00:00Z'
+      },
+      {
+        id: 2,
+        taskId: 42,
+        fromColumn: TaskColumn.Planning,
+        toColumn: TaskColumn.InProgress,
+        contextSnapshot: 'Started work.',
+        movedAt: '2024-01-02T10:00:00Z'
+      }
+    ]
+
+    mockAll.mockReturnValue(mockRecords)
+    registerColumnHistoryHandlers()
+
+    const calls = vi.mocked(ipcMain.handle).mock.calls
+    const handler = calls.find((call) => call[0] === Channels.ColumnHistoryList)?.[1]
+
+    const result = (await handler?.({} as Electron.IpcMainInvokeEvent, {
+      taskId: 42
+    })) as ColumnHistory[]
+
+    expect(result).toEqual(mockRecords)
+    expect(mockDb.select).toHaveBeenCalled()
   })
 })

@@ -92,6 +92,7 @@ export interface IpcChannelMap {
   'links:delete': { request: { id: number }; response: undefined }
 
   'columnHistory:create': { request: InsertColumnHistory; response: ColumnHistory }
+  'columnHistory:list': { request: { taskId: number }; response: ColumnHistory[] }
 
   'intake:fetchMetadata': {
     request: { url: string }

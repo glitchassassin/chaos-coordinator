@@ -1,7 +1,7 @@
 ---
 id: T-006
 title: 'Archive View'
-status: ready
+status: done
 priority: 2
 dependencies: []
 spec_refs: ['§2.3']

@@ -11,6 +11,7 @@ export const Channels = {
   TasksArchive: 'tasks:archive',
   TasksFocus: 'tasks:focus',
   ColumnHistoryCreate: 'columnHistory:create',
+  ColumnHistoryList: 'columnHistory:list',
   LinksList: 'links:list',
   LinksCreate: 'links:create',
   LinksDelete: 'links:delete',
