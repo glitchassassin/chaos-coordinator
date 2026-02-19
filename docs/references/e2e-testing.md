@@ -27,14 +27,17 @@ npx playwright test --grep "board renders column headers"
 
 ```
 e2e/
-  helpers.ts              — App lifecycle + navigation helpers
-  seed.ts                 — Test data seeding utilities
-  app.spec.ts             — Smoke test (app launches)
-  settings.spec.ts        — T-013: Configuration System
-  projects.spec.ts        — T-003: Project Management UI
-  board-view.spec.ts      — T-005: Board View
-  focus-view.spec.ts      — T-004 + T-001: Focus View + Priority Engine
-  context-capture.spec.ts — T-008: Context Capture (Shelving)
+  helpers.ts                   — App lifecycle + navigation helpers
+  seed.ts                      — Test data seeding utilities
+  app.spec.ts                  — Smoke test (app launches)
+  settings.spec.ts             — T-013: Configuration System
+  projects.spec.ts             — T-003: Project Management UI
+  board-view.spec.ts           — T-005: Board View
+  focus-view.spec.ts           — T-004 + T-001: Focus View + Priority Engine
+  context-capture.spec.ts      — T-008: Context Capture (Shelving)
+  archive.spec.ts              — T-006: Archive View
+  task-links.spec.ts           — Task link management
+  url-auto-population.spec.ts   — T-007b: URL-based Auto-population
 ```
 
 ## Writing a New E2E Test
