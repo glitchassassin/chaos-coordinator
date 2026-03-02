@@ -2,9 +2,13 @@ import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { createRequestHandler, type ServerBuild } from "react-router";
+import { getDb } from "../db/client.js";
 
 const BUILD_PATH = "../build/server/index.js";
 const PORT = Number(process.env.PORT ?? 5173);
+
+// Initialize DB and run migrations before accepting requests
+getDb();
 
 const app = new Hono();
 
