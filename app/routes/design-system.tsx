@@ -29,7 +29,7 @@ const SYNTAX_TOKENS = [
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-10">
-      <h2 className="text-lg border-b-ui pb-2 mb-4">{title}</h2>
+      <h2 className="text-lg mb-4">{title}</h2>
       {children}
     </section>
   );
@@ -37,7 +37,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Swatch({ role, value, css, usage }: (typeof COLORS)[number]) {
   return (
-    <div className="flex items-center gap-3 py-2 border-b-ui">
+    <div className="flex items-center gap-3 py-3">
       <div
         aria-label={`${role} color swatch`}
         style={{ backgroundColor: value }}
@@ -62,7 +62,7 @@ export default function DesignSystem() {
       <div className="font-semibold mb-4">Design System</div>
       <nav>
         {["Colors", "Typography", "Layout", "Syntax Highlighting", "Interactive"].map((s) => (
-          <div key={s} className="py-2 border-b-ui">
+          <div key={s} className="py-1">
             <a href={`#${s.toLowerCase().replace(/ /g, "-")}`}>{s}</a>
           </div>
         ))}
@@ -95,7 +95,7 @@ export default function DesignSystem() {
               <h3 style={{ fontSize: "1.25rem" }} className="mb-0">Heading 3 — 1.25rem / 600</h3>
               <h4 style={{ fontSize: "1.125rem" }} className="mb-0">Heading 4 — 1.125rem / 600</h4>
             </div>
-            <div className="border-t-ui pt-3 flex flex-col gap-2">
+            <div className="pt-3 flex flex-col gap-2">
               <p className="m-0">Body text — 18px / 400. System font stack: system-ui, -apple-system, sans-serif.</p>
               <p className="m-0 text-secondary">Secondary text — #555555. Used for timestamps, metadata, and dimmed labels.</p>
               <p className="m-0">Inline <code>code</code> and <a href="#typography">links</a> in running text.</p>
@@ -130,18 +130,18 @@ export default function DesignSystem() {
               <thead>
                 <tr>
                   {["Token", "Sample", "Hex"].map((h) => (
-                    <th key={h} className="text-left px-2 py-1 border-b-ui font-semibold">{h}</th>
+                    <th key={h} className="text-left px-2 py-2 font-semibold">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {SYNTAX_TOKENS.map(({ token, label, sample, style }) => (
                   <tr key={token}>
-                    <td className="px-2 py-1 border-b-ui text-secondary">{label}</td>
-                    <td className="px-2 py-1 border-b-ui">
+                    <td className="px-2 py-2 text-secondary">{label}</td>
+                    <td className="px-2 py-2">
                       <code className={`token ${token} font-mono`} style={style}>{sample}</code>
                     </td>
-                    <td className="px-2 py-1 border-b-ui text-secondary font-mono text-xs">
+                    <td className="px-2 py-2 text-secondary font-mono text-xs">
                       {typeof style.color === "string" ? style.color : "—"}
                       {"fontWeight" in style ? " / bold" : ""}
                       {"fontStyle" in style ? " / italic" : ""}
@@ -178,7 +178,7 @@ export default function DesignSystem() {
             <div className="flex gap-3 flex-wrap items-center">
               <button
                 type="button"
-                className="border-[3px] border-action text-action bg-transparent px-4 font-sans text-base"
+                className="bg-action text-white px-4 font-sans text-base border-none"
               >
                 Button (44px tall)
               </button>

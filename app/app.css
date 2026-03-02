@@ -75,12 +75,50 @@
 /* ─── App layout ─────────────────────────────────────────────────────────── */
 
 @layer components {
-  /* Mobile-first single column; sidebar + main at ≥768px */
+  /*
+   * Layout: header row + body row.
+   * Header is fixed height. Body fills remaining viewport height.
+   * On desktop with sidebar: body splits into two independently scrolling columns.
+   * On mobile: body scrolls as a single column.
+   */
   .app-layout {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .app-header {
+    flex-shrink: 0;
+    background-color: var(--color-bg);
+    border-bottom: 3px solid var(--color-border);
+    padding: 0 0.5rem;
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  .app-sidebar-toggle {
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    line-height: 1;
+    color: var(--color-text);
+    padding: 0 0.5rem;
+  }
+
+  /* Body fills remaining height; scrolls as one unit on mobile */
+  .app-body {
     display: grid;
     grid-template-columns: 1fr;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  /* Mobile with sidebar open: sidebar stacks above main */
+  .app-body.sidebar-open {
     grid-template-rows: auto 1fr;
-    min-height: 100dvh;
   }
 
   .app-sidebar {
@@ -92,16 +130,21 @@
     padding: 1rem;
   }
 
+  /* Desktop: vertical split, each column scrolls independently */
   @media (min-width: 768px) {
-    .app-layout {
+    .app-body.sidebar-open {
       grid-template-columns: 240px 1fr;
       grid-template-rows: 1fr;
+      overflow: hidden;
     }
 
     .app-sidebar {
       border-bottom: none;
-      border-right: 3px solid var(--color-border);
-      min-height: 100dvh;
+      overflow-y: auto;
+    }
+
+    .app-main {
+      overflow-y: auto;
     }
   }
 }
@@ -141,11 +184,14 @@ pre[class*="language-"] {
 }
 
 code:not([class*="language-"]) {
-  background-color: #ffffff;
-  border: 3px solid var(--color-border);
-  padding: 0.125rem 0.375rem;
   font-family: var(--font-mono);
   font-size: 0.875rem;
+}
+
+code:not([class*="language-"])::before,
+code:not([class*="language-"])::after {
+  content: '`';
+  font-weight: bold;
 }
 
 .token.keyword    { color: #2e4057; font-weight: bold; }
