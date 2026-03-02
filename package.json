@@ -1,0 +1,49 @@
+{
+  "name": "chaos-coordinator",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "react-router dev",
+    "build": "react-router build",
+    "start": "tsx server/app.ts",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "validate": "npm run lint && npm run test && npm run test:e2e",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "@react-router/node": "^7.4.0",
+    "better-sqlite3": "^12.1.1",
+    "drizzle-orm": "^0.45.1",
+    "hono": "^4.7.4",
+    "isbot": "^5.1.27",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router": "^7.4.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.1",
+    "@react-router/dev": "^7.4.0",
+    "@tailwindcss/vite": "^4.0.14",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.3.3",
+    "@types/react": "^19.0.7",
+    "@types/react-dom": "^19.0.4",
+    "drizzle-kit": "^0.31.9",
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.0.2",
+    "eslint-plugin-react-hooks": "7.1.0-canary-e0cc7202-20260227",
+    "globals": "^17.4.0",
+    "prettier": "^3.5.3",
+    "tailwindcss": "^4.0.14",
+    "typescript": "^5.8.2",
+    "tsx": "^4.21.0",
+    "typescript-eslint": "^8.26.1",
+    "vite": "^7.3.1",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^4.0.18"
+  }
+}

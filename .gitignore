@@ -1,0 +1,7 @@
+node_modules/
+build/
+.react-router/
+.playwright-mcp/
+test-results/
+data/
+*.db
