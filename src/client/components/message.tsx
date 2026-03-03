@@ -3,6 +3,7 @@ import type { Part, ToolPart } from "../types.js";
 interface Props {
   role: string;
   parts: Part[];
+  showRole?: boolean;
 }
 
 function renderToolPart(part: ToolPart, i: number) {
@@ -57,7 +58,7 @@ function renderPart(part: Part, i: number) {
   }
 }
 
-export function Message({ role, parts }: Props) {
+export function Message({ role, parts, showRole }: Props) {
   // Skip messages with no visible parts
   const hasVisible = parts.some(
     (p) => p.type === "text" || p.type === "tool" || p.type === "reasoning",
@@ -65,8 +66,8 @@ export function Message({ role, parts }: Props) {
   if (!hasVisible && parts.length > 0) return null;
 
   return (
-    <article class="message">
-      <h3 class="message-role">{role}</h3>
+    <article class={`message message--${role}`}>
+      {showRole && <h3 class="message-role">{role}</h3>}
       {parts.map(renderPart)}
     </article>
   );

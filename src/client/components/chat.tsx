@@ -201,13 +201,18 @@ export function Chat({ instanceId, sessionId, initialMessages, onSend }: Props) 
   };
 
   return (
-    <div class="main">
+    <div class="chat-container">
       <div class="chat" ref={chatRef}>
         {messages.length === 0 && (
           <div class="empty-state">No messages yet. Start a conversation.</div>
         )}
-        {messages.map((m) => (
-          <Message key={m.info.id} role={m.info.role} parts={m.parts} />
+        {messages.map((m, i) => (
+          <Message
+            key={m.info.id}
+            role={m.info.role}
+            parts={m.parts}
+            showRole={i === 0 || messages[i - 1].info.role !== m.info.role}
+          />
         ))}
       </div>
       <PermissionBanner permissions={pendingPermissions} onReply={replyPermission} />

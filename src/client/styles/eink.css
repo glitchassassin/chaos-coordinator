@@ -57,6 +57,14 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  overflow: hidden;
+}
+
+.chat-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 /* Sidebar sections */
@@ -159,6 +167,10 @@ body {
 
 .message {
   margin-bottom: 1.5rem;
+}
+
+.message--user {
+  text-align: right;
 }
 
 .message-role {
