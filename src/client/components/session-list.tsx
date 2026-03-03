@@ -28,7 +28,6 @@ export function SessionList({
         <span>Sessions</span>
         <button
           class="btn"
-          style={{ minHeight: "28px", minWidth: "28px", fontSize: "0.75rem", padding: "0 0.5rem" }}
           onClick={onCreate}
         >
           + New
