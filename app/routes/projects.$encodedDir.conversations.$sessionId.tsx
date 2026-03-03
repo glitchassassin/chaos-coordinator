@@ -1,4 +1,5 @@
-import { Form, redirect } from "react-router";
+import { useRef } from "react";
+import { Form, redirect, useSubmit } from "react-router";
 import type { Route } from "./+types/projects.$encodedDir.conversations.$sessionId";
 import { useDoubleCheck } from "~/utils/misc";
 import { getProject } from "../../server/projects.js";
@@ -95,6 +96,99 @@ function StatusBadge({ status }: { status: string }) {
     >
       {status}
     </span>
+  );
+}
+
+// ── Send message form ────────────────────────────────────────────────────────
+
+const MAX_ROWS = 5;
+
+function SendMessageForm({ agentId, sendError }: { agentId: string; sendError?: string }) {
+  const formRef = useRef<HTMLFormElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const submit = useSubmit();
+
+  function computeRows() {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.rows = 1;
+    const style = getComputedStyle(el);
+    const lineHeight = parseFloat(style.lineHeight);
+    const paddingBlock = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+    const lines = Math.round((el.scrollHeight - paddingBlock) / lineHeight);
+    el.rows = Math.min(Math.max(lines, 1), MAX_ROWS);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key !== "Enter" || e.shiftKey) return;
+    e.preventDefault();
+    const form = formRef.current;
+    const textarea = textareaRef.current;
+    if (!form || !textarea) return;
+    submit(form);
+    textarea.value = "";
+    textarea.rows = 1;
+  }
+
+  return (
+    <section>
+      <h2
+        style={{
+          fontSize: "1rem",
+          marginBottom: "1rem",
+          borderBottom: "1px solid #cccccc",
+          paddingBottom: "0.5rem",
+        }}
+      >
+        Send Message
+      </h2>
+      <Form method="post" ref={formRef}>
+        <input type="hidden" name="intent" value="send" />
+        <input type="hidden" name="agentId" value={agentId} />
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end" }}>
+          <textarea
+            ref={textareaRef}
+            name="text"
+            rows={1}
+            aria-label="Message"
+            placeholder="Type a message…"
+            onKeyDown={handleKeyDown}
+            onInput={computeRows}
+            style={{
+              flex: 1,
+              padding: "0.5rem 0.75rem",
+              border: "3px solid #888888",
+              background: "none",
+              fontFamily: "system-ui, -apple-system, sans-serif",
+              fontSize: "1rem",
+              lineHeight: 1.5,
+              resize: "none",
+            }}
+          />
+          <button
+            type="submit"
+            style={{
+              padding: "0.5rem 1rem",
+              border: "3px solid #888888",
+              background: "none",
+              cursor: "pointer",
+              alignSelf: "flex-end",
+              minHeight: 44,
+            }}
+          >
+            Send
+          </button>
+        </div>
+        {sendError && (
+          <p
+            role="alert"
+            style={{ color: "#c62828", marginTop: "0.25rem", fontSize: "0.875rem" }}
+          >
+            {sendError}
+          </p>
+        )}
+      </Form>
+    </section>
   );
 }
 
@@ -220,59 +314,7 @@ export default function ConversationView({ loaderData, actionData }: Route.Compo
 
       {/* Send input */}
       {runningAgent && (
-        <section>
-          <h2
-            style={{
-              fontSize: "1rem",
-              marginBottom: "1rem",
-              borderBottom: "1px solid #cccccc",
-              paddingBottom: "0.5rem",
-            }}
-          >
-            Send Message
-          </h2>
-          <Form method="post">
-            <input type="hidden" name="intent" value="send" />
-            <input type="hidden" name="agentId" value={runningAgent.id} />
-            <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end" }}>
-              <textarea
-                name="text"
-                rows={3}
-                placeholder="Type a message…"
-                style={{
-                  flex: 1,
-                  padding: "0.5rem 0.75rem",
-                  border: "3px solid #888888",
-                  background: "none",
-                  fontFamily: "system-ui, -apple-system, sans-serif",
-                  fontSize: "1rem",
-                  resize: "vertical",
-                }}
-              />
-              <button
-                type="submit"
-                style={{
-                  padding: "0.5rem 1rem",
-                  border: "3px solid #888888",
-                  background: "none",
-                  cursor: "pointer",
-                  alignSelf: "flex-end",
-                  minHeight: 44,
-                }}
-              >
-                Send
-              </button>
-            </div>
-            {sendError && (
-              <p
-                role="alert"
-                style={{ color: "#c62828", marginTop: "0.25rem", fontSize: "0.875rem" }}
-              >
-                {sendError}
-              </p>
-            )}
-          </Form>
-        </section>
+        <SendMessageForm agentId={runningAgent.id} sendError={sendError} />
       )}
     </main>
   );
