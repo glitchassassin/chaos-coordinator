@@ -65,9 +65,9 @@ export function Message({ role, parts }: Props) {
   if (!hasVisible && parts.length > 0) return null;
 
   return (
-    <div class="message">
-      <div class="message-role">{role}</div>
+    <article class="message">
+      <h3 class="message-role">{role}</h3>
       {parts.map(renderPart)}
-    </div>
+    </article>
   );
 }

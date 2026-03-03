@@ -211,7 +211,7 @@ export function Chat({ instanceId, sessionId, initialMessages, onSend }: Props) 
         ))}
       </div>
       <PermissionBanner permissions={pendingPermissions} onReply={replyPermission} />
-      <div class="input-area">
+      <form class="input-area" onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
         <textarea
           value={input}
           onInput={(e) => setInput((e.target as HTMLTextAreaElement).value)}
@@ -220,10 +220,10 @@ export function Chat({ instanceId, sessionId, initialMessages, onSend }: Props) 
           disabled={sending}
           rows={2}
         />
-        <button class="btn btn-primary" onClick={handleSubmit} disabled={sending}>
+        <button type="submit" class="btn btn-primary" disabled={sending}>
           Send
         </button>
-      </div>
+      </form>
     </div>
   );
 }

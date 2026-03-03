@@ -13,8 +13,8 @@ interface Props {
 
 export function InstanceList({ instances, selected, onSelect }: Props) {
   return (
-    <div class="sidebar-section">
-      <div class="sidebar-header">Instances</div>
+    <nav class="sidebar-section">
+      <h2 class="sidebar-header">Instances</h2>
       {instances.length === 0 && (
         <div class="loading">No instances configured</div>
       )}
@@ -29,6 +29,6 @@ export function InstanceList({ instances, selected, onSelect }: Props) {
           <span class="sidebar-item-sub">:{inst.port}</span>
         </button>
       ))}
-    </div>
+    </nav>
   );
 }

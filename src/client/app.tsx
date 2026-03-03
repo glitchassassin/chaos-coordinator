@@ -15,6 +15,7 @@ export function App() {
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
   const [messages, setMessages] = useState<MessageWithParts[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Load instances
   useEffect(() => {
@@ -109,58 +110,61 @@ export function App() {
 
   return (
     <div class="layout">
-      <div class="sidebar">
-        <InstanceList
-          instances={instances}
-          selected={selectedInstance}
-          onSelect={setSelectedInstance}
-        />
-        {selectedInstance && (
-          <SessionList
-            sessions={sessions}
-            selected={selectedSession}
-            onSelect={setSelectedSession}
-            onCreate={handleCreateSession}
-            loading={sessionsLoading}
+      {sidebarOpen && (
+        <aside class="sidebar">
+          <InstanceList
+            instances={instances}
+            selected={selectedInstance}
+            onSelect={setSelectedInstance}
           />
-        )}
-      </div>
-      {selectedInstance && selectedSession ? (
-        <div class="main" style={{ display: "flex", flexDirection: "column" }}>
-          <div class="topbar">
-            <span class="topbar-title">
-              {selectedName} / {selectedSession.slice(0, 12)}
-            </span>
-            <div class="topbar-actions">
-              <a href="/logout" class="btn">
-                Logout
-              </a>
-            </div>
+          {selectedInstance && (
+            <SessionList
+              sessions={sessions}
+              selected={selectedSession}
+              onSelect={setSelectedSession}
+              onCreate={handleCreateSession}
+              loading={sessionsLoading}
+            />
+          )}
+        </aside>
+      )}
+      <main class="main">
+        <header class="topbar">
+          <div class="topbar-left">
+            <button
+              class="btn sidebar-toggle"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+            >
+              ☰
+            </button>
+            <h1 class="topbar-title">
+              {selectedInstance && selectedSession
+                ? `${selectedName} / ${selectedSession.slice(0, 12)}`
+                : "Chaos Coordinator"}
+            </h1>
           </div>
+          <div class="topbar-actions">
+            <a href="/logout" class="btn">
+              Logout
+            </a>
+          </div>
+        </header>
+        {selectedInstance && selectedSession ? (
           <Chat
             instanceId={selectedInstance}
             sessionId={selectedSession}
             initialMessages={messages}
             onSend={handleSendMessage}
           />
-        </div>
-      ) : (
-        <div class="main">
-          <div class="topbar">
-            <span class="topbar-title">Chaos Coordinator</span>
-            <div class="topbar-actions">
-              <a href="/logout" class="btn">
-                Logout
-              </a>
-            </div>
-          </div>
+        ) : (
           <div class="empty-state">
             {!selectedInstance
               ? "Select an instance to get started."
               : "Select or create a session."}
           </div>
-        </div>
-      )}
+        )}
+      </main>
     </div>
   );
 }

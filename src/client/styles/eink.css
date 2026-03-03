@@ -89,16 +89,33 @@ body {
   padding: 0.5rem 0.75rem;
   border-bottom: 2px solid #000;
   min-height: 44px;
+  flex-shrink: 0;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
 }
 
 .topbar-title {
   font-size: 1rem;
   font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .topbar-actions {
   display: flex;
   gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.sidebar-toggle {
+  font-size: 1.25rem;
+  padding: 0.25rem 0.5rem;
 }
 
 /* Buttons */
@@ -258,5 +275,6 @@ body {
     border-right: none;
     border-bottom: 2px solid #000;
     max-height: 40vh;
+    flex-shrink: 0;
   }
 }

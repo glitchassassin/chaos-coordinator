@@ -20,19 +20,19 @@ export function SessionList({
   loading,
 }: Props) {
   return (
-    <div class="sidebar-section" style={{ flex: 1, overflow: "auto" }}>
-      <div
+    <nav class="sidebar-section" style={{ flex: 1, overflow: "auto" }}>
+      <h2
         class="sidebar-header"
         style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
       >
-        <span>Sessions</span>
+        Sessions
         <button
           class="btn"
           onClick={onCreate}
         >
           + New
         </button>
-      </div>
+      </h2>
       {loading && <div class="loading">Loading...</div>}
       {!loading && sessions.length === 0 && (
         <div class="loading">No sessions</div>
@@ -47,6 +47,6 @@ export function SessionList({
           {s.title || s.id.slice(0, 12)}
         </button>
       ))}
-    </div>
+    </nav>
   );
 }
