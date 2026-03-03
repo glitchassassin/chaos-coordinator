@@ -124,6 +124,11 @@ export function getAgent(id: string, db: Db = getDb()): Agent | undefined {
   return db.select().from(agents).where(eq(agents.id, id)).get();
 }
 
+/** Persist a resolved log file path for an agent. */
+export function updateLogPath(agentId: string, logPath: string, db: Db = getDb()): void {
+  db.update(agents).set({ logPath }).where(eq(agents.id, agentId)).run();
+}
+
 /**
  * Reconcile agent records against live tmux sessions.
  * Called on server startup to re-adopt running sessions and mark

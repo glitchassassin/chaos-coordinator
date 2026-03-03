@@ -4,6 +4,8 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { createRequestHandler, type ServerBuild } from "react-router";
 import { getDb } from "../db/client.js";
 import { reconcileAgents, startPolling } from "./agents.js";
+import { createNodeWebSocket } from "@hono/node-ws";
+import { setupWs } from "./ws.js";
 
 const BUILD_PATH = "../build/server/index.js";
 const PORT = Number(process.env.PORT ?? 5173);
@@ -15,6 +17,11 @@ startPolling();
 
 const app = new Hono();
 
+const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
+
+// WebSocket endpoint for live log streaming
+setupWs(app, upgradeWebSocket);
+
 // Serve all static client assets (falls through to React Router for non-files)
 app.use(serveStatic({ root: "./build/client" }));
 
@@ -24,6 +31,8 @@ const handler = createRequestHandler(build);
 
 app.all("*", (c) => handler(c.req.raw));
 
-serve({ fetch: app.fetch, port: PORT }, () => {
+const server = serve({ fetch: app.fetch, port: PORT }, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
+
+injectWebSocket(server);

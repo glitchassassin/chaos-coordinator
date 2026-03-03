@@ -61,6 +61,10 @@ export function listProjects(db: Db = getDb()): Project[] {
   return db.select().from(projects).where(isNull(projects.removedAt)).all();
 }
 
+export function getProject(id: string, db: Db = getDb()): Project | undefined {
+  return db.select().from(projects).where(eq(projects.id, id)).get();
+}
+
 export function removeProject(id: string, db: Db = getDb()): void {
   const removedAt = new Date().toISOString();
   db.update(projects).set({ removedAt }).where(eq(projects.id, id)).run();
