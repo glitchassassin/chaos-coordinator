@@ -9,7 +9,12 @@ vi.mock("./tmux.js", () => ({
   sessionExists: vi.fn().mockReturnValue(true),
 }));
 
+vi.mock("./logs.js", () => ({
+  findAgentLog: vi.fn().mockReturnValue(null),
+}));
+
 import * as tmux from "./tmux.js";
+import * as logs from "./logs.js";
 import {
   launchAgent,
   sendInput,
@@ -24,6 +29,7 @@ import {
 } from "./agents.js";
 
 const mockTmux = vi.mocked(tmux);
+const mockLogs = vi.mocked(logs);
 
 beforeEach(() => {
   _clearAgents();
@@ -33,6 +39,7 @@ beforeEach(() => {
   mockTmux.killSession.mockReset();
   mockTmux.listSessions.mockReturnValue([]);
   mockTmux.sessionExists.mockReturnValue(true);
+  mockLogs.findAgentLog.mockReturnValue(null);
 });
 
 describe("inferStatus", () => {
@@ -214,5 +221,24 @@ describe("pollAgent", () => {
     mockTmux.capturePane.mockClear();
     pollAgent("nonexistent");
     expect(mockTmux.capturePane).not.toHaveBeenCalled();
+  });
+
+  it("discovers conversation log and sets claudeSessionId", () => {
+    mockTmux.capturePane.mockReturnValue("some output\n");
+    mockLogs.findAgentLog.mockReturnValue("/home/.claude/projects/enc/abc-123-def.jsonl");
+    const agent = launchAgent("enc-dir", "/tmp/test");
+    pollAgent(agent.id);
+    expect(getAgent(agent.id)?.claudeSessionId).toBe("abc-123-def");
+    expect(getAgent(agent.id)?.logPath).toBe("/home/.claude/projects/enc/abc-123-def.jsonl");
+  });
+
+  it("does not re-discover log once claudeSessionId is set", () => {
+    mockTmux.capturePane.mockReturnValue("some output\n");
+    mockLogs.findAgentLog.mockReturnValue("/home/.claude/projects/enc/abc.jsonl");
+    const agent = launchAgent("enc-dir", "/tmp/test");
+    pollAgent(agent.id);
+    mockLogs.findAgentLog.mockClear();
+    pollAgent(agent.id);
+    expect(mockLogs.findAgentLog).not.toHaveBeenCalled();
   });
 });

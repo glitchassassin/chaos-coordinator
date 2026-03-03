@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { Form, redirect } from "react-router";
+import { useEffect, useMemo } from "react";
+import { Form, redirect, useRevalidator } from "react-router";
 import type { Route } from "./+types/projects.$encodedDir";
 import { useDoubleCheck } from "~/utils/misc";
 import { getProject } from "../../server/projects.js";
@@ -137,18 +137,12 @@ function formatAge(createdAt: string): string {
 function AgentRow({ agent, encodedDir }: { agent: RunningAgent; encodedDir: string }) {
   const dc = useDoubleCheck();
   const age = useMemo(() => formatAge(agent.createdAt), [agent.createdAt]);
+  const href = agent.claudeSessionId
+    ? `/projects/${encodedDir}/conversations/${agent.claudeSessionId}`
+    : null;
 
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "0.5rem",
-        padding: "0.375rem 0",
-        fontSize: "0.875rem",
-        flexWrap: "wrap",
-      }}
-    >
+  const content = (
+    <>
       <StatusBadge status={agent.status} />
       <span style={{ color: "#555555" }}>{age} ago</span>
       {agent.initialPrompt && (
@@ -165,44 +159,63 @@ function AgentRow({ agent, encodedDir }: { agent: RunningAgent; encodedDir: stri
           {agent.initialPrompt}
         </span>
       )}
-      <div style={{ marginLeft: "auto", display: "flex", gap: "0.5rem" }}>
-        {agent.claudeSessionId && (
-          <a
-            href={`/projects/${encodedDir}/conversations/${agent.claudeSessionId}`}
-            style={{
-              padding: "0.25rem 0.625rem",
-              border: "2px solid #1565c0",
-              color: "#1565c0",
-              textDecoration: "none",
-              fontSize: "0.8125rem",
-              display: "inline-block",
-              minHeight: 32,
-              lineHeight: "1.5",
-            }}
-          >
-            View
-          </a>
-        )}
-        <Form method="post" style={{ display: "inline" }}>
-          <input type="hidden" name="intent" value="terminate" />
-          <input type="hidden" name="id" value={agent.id} />
-          <button
-            type="submit"
-            {...dc.getButtonProps()}
-            style={{
-              padding: "0.25rem 0.625rem",
-              border: "2px solid #c62828",
-              color: "#c62828",
-              background: "none",
-              cursor: "pointer",
-              fontSize: "0.8125rem",
-              minHeight: 32,
-            }}
-          >
-            {dc.doubleCheck ? "Confirm?" : "Terminate"}
-          </button>
-        </Form>
-      </div>
+    </>
+  );
+
+  const rowStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    padding: "0.375rem 0",
+    fontSize: "0.875rem",
+    flexWrap: "wrap",
+  };
+
+  return (
+    <div style={rowStyle}>
+      {href ? (
+        <a
+          href={href}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            flex: 1,
+            minWidth: 0,
+            color: "inherit",
+            textDecoration: "none",
+          }}
+        >
+          {content}
+        </a>
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flex: 1, minWidth: 0 }}>
+          {content}
+        </div>
+      )}
+      <Form
+        method="post"
+        style={{ display: "inline", marginLeft: "auto", flexShrink: 0 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <input type="hidden" name="intent" value="terminate" />
+        <input type="hidden" name="id" value={agent.id} />
+        <button
+          type="submit"
+          {...dc.getButtonProps()}
+          style={{
+            padding: "0.25rem 0.625rem",
+            border: "2px solid #c62828",
+            color: "#c62828",
+            background: "none",
+            cursor: "pointer",
+            fontSize: "0.8125rem",
+            minHeight: 32,
+          }}
+        >
+          {dc.doubleCheck ? "Confirm?" : "Terminate"}
+        </button>
+      </Form>
     </div>
   );
 }
@@ -289,6 +302,16 @@ function ConversationRow({
 
 export default function ProjectDetail({ loaderData, actionData }: Route.ComponentProps) {
   const { project, agents, conversations } = loaderData;
+  const revalidator = useRevalidator();
+
+  // Poll for agent status updates while agents are running
+  useEffect(() => {
+    if (agents.length === 0) return;
+    const id = setInterval(() => {
+      if (revalidator.state === "idle") revalidator.revalidate();
+    }, 3_000);
+    return () => clearInterval(id);
+  }, [agents.length, revalidator]);
 
   const launchError =
     actionData?.intent === "launch" && "error" in actionData ? actionData.error : undefined;

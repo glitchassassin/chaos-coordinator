@@ -1,4 +1,6 @@
+import path from "node:path";
 import * as tmux from "./tmux.js";
+import { findAgentLog } from "./logs.js";
 
 export interface RunningAgent {
   id: string;
@@ -174,6 +176,7 @@ export function pollAgent(agentId: string): void {
   if (!agent) return;
 
   if (!tmux.sessionExists(agent.tmuxSession)) {
+    console.log(`[agent ${agentId.slice(0, 8)}] session gone — removing`);
     agents.delete(agentId);
     pollState.delete(agentId);
     return;
@@ -181,20 +184,32 @@ export function pollAgent(agentId: string): void {
 
   const capture = tmux.capturePane(agent.tmuxSession);
   const now = Date.now();
+  const prev = agent.status;
   const state = pollState.get(agentId);
 
   if (!state) {
     pollState.set(agentId, { lastCapture: capture, lastChangeAt: now });
     agent.status = inferStatus(capture);
-    return;
-  }
-
-  if (capture !== state.lastCapture) {
+  } else if (capture !== state.lastCapture) {
     state.lastCapture = capture;
     state.lastChangeAt = now;
     agent.status = inferStatus(capture);
   } else if (now - state.lastChangeAt > IDLE_THRESHOLD_MS) {
     agent.status = "idle";
+  }
+
+  if (agent.status !== prev) {
+    console.log(`[agent ${agentId.slice(0, 8)}] ${prev} → ${agent.status}`);
+  }
+
+  // Discover the conversation log file once
+  if (!agent.claudeSessionId && agent.directory) {
+    const logFile = findAgentLog(agent.directory, agent.createdAt);
+    if (logFile) {
+      agent.logPath = logFile;
+      agent.claudeSessionId = path.basename(logFile, ".jsonl");
+      console.log(`[agent ${agentId.slice(0, 8)}] linked to session ${agent.claudeSessionId.slice(0, 8)}`);
+    }
   }
 }
 
@@ -217,4 +232,14 @@ export function startPolling(): () => void {
 export function _clearAgents(): void {
   agents.clear();
   pollState.clear();
+}
+
+// ── Auto-start ────────────────────────────────────────────────────────────────
+// Runs once when the module is first imported (works in both `react-router dev`
+// and the production Hono server). Skipped during Vitest runs.
+
+if (process.env.NODE_ENV !== "test") {
+  reconcileAgents();
+  startPolling();
+  console.log("[agents] polling started");
 }

@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { useRevalidator } from "react-router";
 import type { Route } from "./+types/home";
 import { listProjects } from "../../server/projects.js";
 import { listAgents, type RunningAgent } from "../../server/agents.js";
@@ -176,6 +178,16 @@ function ProjectRow({
 
 export default function Home({ loaderData }: Route.ComponentProps) {
   const { projects, agents } = loaderData;
+  const revalidator = useRevalidator();
+
+  // Poll for agent status updates while agents are running
+  useEffect(() => {
+    if (agents.length === 0) return;
+    const id = setInterval(() => {
+      if (revalidator.state === "idle") revalidator.revalidate();
+    }, 3_000);
+    return () => clearInterval(id);
+  }, [agents.length, revalidator]);
 
   // Group agents by encodedDir
   const agentsByDir = new Map<string, RunningAgent[]>();
