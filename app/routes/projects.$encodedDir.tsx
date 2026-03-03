@@ -30,8 +30,8 @@ export async function action({ params, request }: Route.ActionArgs) {
 
     const initialPrompt = (form.get("initialPrompt") as string | null)?.trim() ?? undefined;
     try {
-      launchAgent(project.encodedDir, project.directory, initialPrompt);
-      return redirect(`/projects/${project.encodedDir}`);
+      const agent = launchAgent(project.encodedDir, project.directory, initialPrompt);
+      return redirect(`/projects/${project.encodedDir}/agents/${agent.id}`);
     } catch (err) {
       return { intent: "launch" as const, error: (err as Error).message };
     }

@@ -5,6 +5,10 @@ export default [
   route("design-system", "routes/design-system.tsx"),
   route("projects/:encodedDir", "routes/projects.$encodedDir.tsx"),
   route(
+    "projects/:encodedDir/agents/:agentId",
+    "routes/projects.$encodedDir.agents.$agentId.tsx",
+  ),
+  route(
     "projects/:encodedDir/conversations/:sessionId",
     "routes/projects.$encodedDir.conversations.$sessionId.tsx",
   ),

@@ -3,6 +3,16 @@ import os from "node:os";
 import * as tmux from "./tmux.js";
 import { encodeDirectory } from "./logs.js";
 
+export interface PromptOption {
+  key: string;   // "1", "2", "3", "y", "n", etc.
+  label: string; // "Yes", "No", etc.
+}
+
+export interface PermissionPrompt {
+  question: string;
+  options: PromptOption[];
+}
+
 export interface RunningAgent {
   id: string;
   encodedDir: string;
@@ -13,6 +23,7 @@ export interface RunningAgent {
   claudeSessionId: string | null;
   logPath: string | null;
   createdAt: string;
+  permissionPrompt: PermissionPrompt | null;
 }
 
 export type AgentStatus = RunningAgent["status"] | "terminated";
@@ -64,6 +75,7 @@ export function launchAgent(
     claudeSessionId: null,
     logPath: null,
     createdAt: new Date().toISOString(),
+    permissionPrompt: null,
   };
 
   agents.set(id, agent);
@@ -77,6 +89,16 @@ export function sendInput(agentId: string, text: string): void {
   const agent = agents.get(agentId);
   if (!agent) throw new Error(`Agent not found: ${agentId}`);
   tmux.sendInput(agent.tmuxSession, text);
+}
+
+/**
+ * Respond to a permission prompt by sending a single keystroke.
+ * Used for numbered-option prompts (sends "1", "2", etc.) and Escape to cancel.
+ */
+export function respondToPrompt(agentId: string, key: string): void {
+  const agent = agents.get(agentId);
+  if (!agent) throw new Error(`Agent not found: ${agentId}`);
+  tmux.pressKey(agent.tmuxSession, key);
 }
 
 /** Capture the current terminal screen for an agent. */
@@ -151,8 +173,53 @@ export function reconcileAgents(): void {
       claudeSessionId: null,
       logPath: null,
       createdAt: new Date().toISOString(),
+      permissionPrompt: null,
     });
   }
+}
+
+/**
+ * Parse a numbered-option permission prompt from tmux capture-pane output.
+ *
+ * Claude Code renders prompts like:
+ *   Do you want to create test.txt?
+ *   ❯ 1. Yes
+ *     2. Yes, allow all edits during this session (shift+tab)
+ *     3. No
+ *
+ * Returns null if no recognizable prompt is found.
+ */
+export function parsePermissionPrompt(capture: string): PermissionPrompt | null {
+  const lines = capture.trimEnd().split("\n");
+  // Scan from the bottom for numbered options (they cluster at the end)
+  const optionRe = /^\s*[❯►▸> ]\s*(\d+)\.\s+(.+)$/;
+  const options: PromptOption[] = [];
+  let firstOptionIdx = -1;
+
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const m = optionRe.exec(lines[i]);
+    if (m) {
+      options.unshift({ key: m[1], label: m[2].trim() });
+      firstOptionIdx = i;
+    } else if (options.length > 0) {
+      // We've moved past the option block
+      break;
+    }
+  }
+
+  if (options.length === 0) return null;
+
+  // The question is the non-empty line(s) immediately above the first option
+  let question = "";
+  for (let i = firstOptionIdx - 1; i >= 0; i--) {
+    const trimmed = lines[i].trim();
+    if (!trimmed) break;
+    // Stop if we hit a decorative line (─, ╌, ═, etc.)
+    if (/^[─╌═┄┈╍╌━]+$/.test(trimmed)) break;
+    question = trimmed + (question ? " " + question : "");
+  }
+
+  return { question, options };
 }
 
 /**
@@ -210,8 +277,14 @@ export function pollAgent(agentId: string): void {
     state.lastChangeAt = now;
     agent.status = inferStatus(capture);
   } else if (now - state.lastChangeAt > IDLE_THRESHOLD_MS) {
-    agent.status = "idle";
+    // If capture looks like a prompt, stay "waiting" — don't override with "idle"
+    const inferred = inferStatus(capture);
+    agent.status = inferred === "waiting" ? "waiting" : "idle";
   }
+
+  // Parse permission prompt when waiting, clear when not
+  agent.permissionPrompt =
+    agent.status === "waiting" ? parsePermissionPrompt(capture) : null;
 
   if (agent.status !== prev) {
     console.log(`[agent ${agentId.slice(0, 8)}] ${prev} → ${agent.status}`);

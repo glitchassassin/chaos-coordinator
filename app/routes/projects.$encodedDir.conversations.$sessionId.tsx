@@ -1,9 +1,15 @@
-import { useRef } from "react";
-import { Form, redirect, useSubmit } from "react-router";
+import { useEffect, useRef } from "react";
+import { Form, redirect, useRevalidator, useSubmit } from "react-router";
 import type { Route } from "./+types/projects.$encodedDir.conversations.$sessionId";
 import { useDoubleCheck } from "~/utils/misc";
 import { getProject } from "../../server/projects.js";
-import { listAgents, sendInput, terminateAgent } from "../../server/agents.js";
+import {
+  listAgents,
+  sendInput,
+  respondToPrompt,
+  terminateAgent,
+  type PermissionPrompt as PermissionPromptType,
+} from "../../server/agents.js";
 import { readLog } from "../../server/logs.js";
 import { ConversationLog } from "~/components/ConversationLog";
 import path from "node:path";
@@ -32,7 +38,20 @@ export function loader({ params }: Route.LoaderArgs) {
   const agents = listAgents(project.encodedDir);
   const runningAgent = agents.find((a) => a.claudeSessionId === sessionId) ?? null;
 
-  return { project, sessionId, entries, runningAgent };
+  return {
+    project,
+    sessionId,
+    entries,
+    runningAgent: runningAgent
+      ? {
+          id: runningAgent.id,
+          status: runningAgent.status,
+          tmuxSession: runningAgent.tmuxSession,
+          createdAt: runningAgent.createdAt,
+          permissionPrompt: runningAgent.permissionPrompt,
+        }
+      : null,
+  };
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
@@ -50,6 +69,19 @@ export async function action({ params, request }: Route.ActionArgs) {
       }
     }
     return { intent: "send" as const, ok: true };
+  }
+
+  if (intent === "respond") {
+    const agentId = form.get("agentId") as string;
+    const key = form.get("key") as string;
+    if (key) {
+      try {
+        respondToPrompt(agentId, key);
+      } catch (err) {
+        return { intent: "respond" as const, error: (err as Error).message };
+      }
+    }
+    return { intent: "respond" as const, ok: true };
   }
 
   if (intent === "terminate") {
@@ -87,6 +119,88 @@ function StatusBadge({ status }: { status: string }) {
     >
       {status}
     </span>
+  );
+}
+
+// ── Permission prompt ─────────────────────────────────────────────────────────
+
+function PermissionPromptPanel({
+  agentId,
+  prompt,
+}: {
+  agentId: string;
+  prompt: PermissionPromptType;
+}) {
+  const submit = useSubmit();
+
+  function respond(key: string) {
+    const formData = new FormData();
+    formData.set("intent", "respond");
+    formData.set("agentId", agentId);
+    formData.set("key", key);
+    submit(formData, { method: "post" });
+  }
+
+  return (
+    <section
+      style={{
+        marginBottom: "1.5rem",
+        border: "3px solid #f57f17",
+        padding: "1rem",
+      }}
+    >
+      <div
+        style={{
+          fontSize: "0.6875rem",
+          fontWeight: 700,
+          color: "#f57f17",
+          textTransform: "uppercase",
+          letterSpacing: "0.07em",
+          marginBottom: "0.5rem",
+        }}
+      >
+        Permission Required
+      </div>
+      {prompt.question && (
+        <p style={{ marginBottom: "0.75rem", fontSize: "0.9375rem" }}>
+          {prompt.question}
+        </p>
+      )}
+      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+        {prompt.options.map((opt) => (
+          <button
+            key={opt.key}
+            type="button"
+            onClick={() => respond(opt.key)}
+            style={{
+              padding: "0.375rem 0.75rem",
+              border: "2px solid #888888",
+              background: "none",
+              cursor: "pointer",
+              fontSize: "0.875rem",
+              minHeight: 36,
+            }}
+          >
+            {opt.label}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => respond("Escape")}
+          style={{
+            padding: "0.375rem 0.75rem",
+            border: "2px solid #c62828",
+            color: "#c62828",
+            background: "none",
+            cursor: "pointer",
+            fontSize: "0.875rem",
+            minHeight: 36,
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -190,6 +304,16 @@ export default function ConversationView({ loaderData, actionData }: Route.Compo
   const sendError =
     actionData && "error" in actionData ? (actionData as { error: string }).error : undefined;
   const dc = useDoubleCheck();
+  const revalidator = useRevalidator();
+
+  // Poll every 3s while a running agent exists (for live status/prompt updates)
+  useEffect(() => {
+    if (!runningAgent) return;
+    const id = setInterval(() => {
+      if (revalidator.state === "idle") revalidator.revalidate();
+    }, 3_000);
+    return () => clearInterval(id);
+  }, [runningAgent, revalidator]);
 
   return (
     <main style={{ maxWidth: 900, margin: "0 auto", padding: "2rem 1rem" }}>
@@ -276,6 +400,14 @@ export default function ConversationView({ loaderData, actionData }: Route.Compo
           agentId={runningAgent?.id}
         />
       </section>
+
+      {/* Permission prompt */}
+      {runningAgent?.permissionPrompt && (
+        <PermissionPromptPanel
+          agentId={runningAgent.id}
+          prompt={runningAgent.permissionPrompt}
+        />
+      )}
 
       {/* Debug: tmux attach command */}
       {runningAgent && (

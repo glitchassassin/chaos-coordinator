@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("./tmux.js", () => ({
   createSession: vi.fn(),
   sendInput: vi.fn(),
+  pressKey: vi.fn(),
   capturePane: vi.fn().mockReturnValue(""),
   killSession: vi.fn(),
   listSessions: vi.fn().mockReturnValue([]),
@@ -18,6 +19,7 @@ import * as tmux from "./tmux.js";
 import {
   launchAgent,
   sendInput,
+  respondToPrompt,
   readScreen,
   terminateAgent,
   listAgents,
@@ -25,6 +27,7 @@ import {
   reconcileAgents,
   pollAgent,
   inferStatus,
+  parsePermissionPrompt,
   parseSessionId,
   _clearAgents,
 } from "./agents.js";
@@ -35,6 +38,7 @@ beforeEach(() => {
   _clearAgents();
   mockTmux.createSession.mockReset();
   mockTmux.sendInput.mockReset();
+  mockTmux.pressKey.mockReset();
   mockTmux.capturePane.mockReturnValue("");
   mockTmux.killSession.mockReset();
   mockTmux.listSessions.mockReturnValue([]);
@@ -246,6 +250,23 @@ describe("pollAgent", () => {
     expect(getAgent(agent.id)?.status).toBe("waiting");
   });
 
+  it("stays waiting (not idle) when prompt is unchanged past idle threshold", () => {
+    const capture = "Do you want to proceed? (y/N)";
+    mockTmux.capturePane.mockReturnValue(capture);
+    const agent = launchAgent("enc-dir", "/tmp/test");
+
+    // First poll: detects waiting
+    pollAgent(agent.id);
+    expect(getAgent(agent.id)?.status).toBe("waiting");
+
+    // Simulate time passing beyond idle threshold with same capture
+    vi.useFakeTimers();
+    vi.advanceTimersByTime(60_000);
+    pollAgent(agent.id);
+    expect(getAgent(agent.id)?.status).toBe("waiting");
+    vi.useRealTimers();
+  });
+
   it("removes agent when session disappears", () => {
     mockTmux.sessionExists.mockReturnValue(false);
     const agent = launchAgent("enc-dir", "/tmp/test");
@@ -333,5 +354,159 @@ describe("pollAgent", () => {
     );
     pollAgent(agent.id);
     expect(getAgent(agent.id)?.claudeSessionId).toBe("abc00000-1234-5678-9abc-def012345678");
+  });
+
+  it("populates permissionPrompt when status is waiting", () => {
+    const capture = [
+      "some output",
+      "",
+      " Do you want to create test.txt?",
+      " ❯ 1. Yes",
+      "   2. Yes, allow all edits during this session (shift+tab)",
+      "   3. No",
+    ].join("\n");
+    mockTmux.capturePane.mockReturnValue(capture);
+    const agent = launchAgent("enc-dir", "/tmp/test");
+    pollAgent(agent.id);
+    expect(getAgent(agent.id)?.status).toBe("waiting");
+    expect(getAgent(agent.id)?.permissionPrompt).toEqual({
+      question: "Do you want to create test.txt?",
+      options: [
+        { key: "1", label: "Yes" },
+        { key: "2", label: "Yes, allow all edits during this session (shift+tab)" },
+        { key: "3", label: "No" },
+      ],
+    });
+  });
+
+  it("clears permissionPrompt when status is not waiting", () => {
+    // First poll: waiting with a prompt
+    const waitCapture = [
+      " Do you want to create test.txt?",
+      " ❯ 1. Yes",
+      "   2. No",
+    ].join("\n");
+    mockTmux.capturePane.mockReturnValue(waitCapture);
+    const agent = launchAgent("enc-dir", "/tmp/test");
+    pollAgent(agent.id);
+    expect(getAgent(agent.id)?.permissionPrompt).not.toBeNull();
+
+    // Second poll: no longer waiting
+    mockTmux.capturePane.mockReturnValue("some active output\n");
+    pollAgent(agent.id);
+    expect(getAgent(agent.id)?.permissionPrompt).toBeNull();
+  });
+});
+
+describe("parsePermissionPrompt", () => {
+  it("parses a standard Claude Code permission prompt", () => {
+    const capture = [
+      "⏺ Write(test.txt)",
+      "──────────────────────────────────────────",
+      " Create file",
+      " test.txt",
+      "╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌",
+      "  1 Tue Mar  3 11:05:49 EST 2026",
+      "╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌",
+      " Do you want to create test.txt?",
+      " ❯ 1. Yes",
+      "   2. Yes, allow all edits during this session (shift+tab)",
+      "   3. No",
+    ].join("\n");
+    const result = parsePermissionPrompt(capture);
+    expect(result).toEqual({
+      question: "Do you want to create test.txt?",
+      options: [
+        { key: "1", label: "Yes" },
+        { key: "2", label: "Yes, allow all edits during this session (shift+tab)" },
+        { key: "3", label: "No" },
+      ],
+    });
+  });
+
+  it("returns null when there are no numbered options", () => {
+    expect(parsePermissionPrompt("some terminal output\n")).toBeNull();
+  });
+
+  it("returns null for empty string", () => {
+    expect(parsePermissionPrompt("")).toBeNull();
+  });
+
+  it("handles two-option prompt", () => {
+    const capture = [
+      " Allow this bash command?",
+      " ❯ 1. Yes",
+      "   2. No",
+    ].join("\n");
+    const result = parsePermissionPrompt(capture);
+    expect(result).toEqual({
+      question: "Allow this bash command?",
+      options: [
+        { key: "1", label: "Yes" },
+        { key: "2", label: "No" },
+      ],
+    });
+  });
+
+  it("handles prompt without arrow indicator", () => {
+    const capture = [
+      " Do you want to proceed?",
+      "   1. Yes",
+      "   2. No",
+    ].join("\n");
+    const result = parsePermissionPrompt(capture);
+    expect(result).toEqual({
+      question: "Do you want to proceed?",
+      options: [
+        { key: "1", label: "Yes" },
+        { key: "2", label: "No" },
+      ],
+    });
+  });
+
+  it("handles multi-line question above options", () => {
+    const capture = [
+      "",
+      " Run npm install?",
+      " ❯ 1. Yes",
+      "   2. No",
+    ].join("\n");
+    const result = parsePermissionPrompt(capture);
+    expect(result).toEqual({
+      question: "Run npm install?",
+      options: [
+        { key: "1", label: "Yes" },
+        { key: "2", label: "No" },
+      ],
+    });
+  });
+
+  it("stops question extraction at decorative lines", () => {
+    const capture = [
+      "╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌",
+      " Do you want to create test.txt?",
+      " ❯ 1. Yes",
+      "   2. No",
+    ].join("\n");
+    const result = parsePermissionPrompt(capture);
+    expect(result?.question).toBe("Do you want to create test.txt?");
+  });
+});
+
+describe("respondToPrompt", () => {
+  it("sends a keystroke via pressKey to the agent's tmux session", () => {
+    const agent = launchAgent("enc-dir", "/tmp/test");
+    respondToPrompt(agent.id, "1");
+    expect(mockTmux.pressKey).toHaveBeenCalledWith(agent.tmuxSession, "1");
+  });
+
+  it("sends Escape key for cancel", () => {
+    const agent = launchAgent("enc-dir", "/tmp/test");
+    respondToPrompt(agent.id, "Escape");
+    expect(mockTmux.pressKey).toHaveBeenCalledWith(agent.tmuxSession, "Escape");
+  });
+
+  it("throws when agent does not exist", () => {
+    expect(() => respondToPrompt("nonexistent", "1")).toThrow("Agent not found");
   });
 });
