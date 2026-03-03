@@ -10,11 +10,10 @@ vi.mock("./tmux.js", () => ({
 }));
 
 vi.mock("./logs.js", () => ({
-  findAgentLog: vi.fn().mockReturnValue(null),
+  encodeDirectory: vi.fn((dir: string) => dir.replaceAll("/", "-")),
 }));
 
 import * as tmux from "./tmux.js";
-import * as logs from "./logs.js";
 import {
   launchAgent,
   sendInput,
@@ -25,11 +24,11 @@ import {
   reconcileAgents,
   pollAgent,
   inferStatus,
+  parseSessionId,
   _clearAgents,
 } from "./agents.js";
 
 const mockTmux = vi.mocked(tmux);
-const mockLogs = vi.mocked(logs);
 
 beforeEach(() => {
   _clearAgents();
@@ -39,7 +38,33 @@ beforeEach(() => {
   mockTmux.killSession.mockReset();
   mockTmux.listSessions.mockReturnValue([]);
   mockTmux.sessionExists.mockReturnValue(true);
-  mockLogs.findAgentLog.mockReturnValue(null);
+});
+
+describe("parseSessionId", () => {
+  it("extracts session UUID from capture output", () => {
+    const capture = "some output\n  session: abc00000-1234-5678-9abc-def012345678\n";
+    expect(parseSessionId(capture)).toBe("abc00000-1234-5678-9abc-def012345678");
+  });
+
+  it("returns null when no session line is present", () => {
+    expect(parseSessionId("some terminal output\n")).toBeNull();
+  });
+
+  it("returns null for empty string", () => {
+    expect(parseSessionId("")).toBeNull();
+  });
+
+  it("handles session line embedded in Claude Code UI chrome", () => {
+    const capture = [
+      "╭─── Claude Code v2.1.63 ───╮",
+      "│ Welcome back Jon!          │",
+      "╰────────────────────────────╯",
+      "❯ hello",
+      "──────────────────────────────",
+      "  session: e5e0ba8b-b842-434b-9b3f-302cf04bb5cd",
+    ].join("\n");
+    expect(parseSessionId(capture)).toBe("e5e0ba8b-b842-434b-9b3f-302cf04bb5cd");
+  });
 });
 
 describe("inferStatus", () => {
@@ -223,22 +248,28 @@ describe("pollAgent", () => {
     expect(mockTmux.capturePane).not.toHaveBeenCalled();
   });
 
-  it("discovers conversation log and sets claudeSessionId", () => {
-    mockTmux.capturePane.mockReturnValue("some output\n");
-    mockLogs.findAgentLog.mockReturnValue("/home/.claude/projects/enc/abc-123-def.jsonl");
+  it("discovers session ID from tmux capture and sets claudeSessionId", () => {
+    mockTmux.capturePane.mockReturnValue(
+      "some output\n  session: abc00000-1234-5678-9abc-def012345678\n",
+    );
     const agent = launchAgent("enc-dir", "/tmp/test");
     pollAgent(agent.id);
-    expect(getAgent(agent.id)?.claudeSessionId).toBe("abc-123-def");
-    expect(getAgent(agent.id)?.logPath).toBe("/home/.claude/projects/enc/abc-123-def.jsonl");
+    expect(getAgent(agent.id)?.claudeSessionId).toBe("abc00000-1234-5678-9abc-def012345678");
+    expect(getAgent(agent.id)?.logPath).toContain("abc00000-1234-5678-9abc-def012345678.jsonl");
   });
 
-  it("does not re-discover log once claudeSessionId is set", () => {
-    mockTmux.capturePane.mockReturnValue("some output\n");
-    mockLogs.findAgentLog.mockReturnValue("/home/.claude/projects/enc/abc.jsonl");
+  it("does not re-discover session once claudeSessionId is set", () => {
+    mockTmux.capturePane.mockReturnValue(
+      "some output\n  session: abc00000-1234-5678-9abc-def012345678\n",
+    );
     const agent = launchAgent("enc-dir", "/tmp/test");
     pollAgent(agent.id);
-    mockLogs.findAgentLog.mockClear();
+
+    // Change the capture to show a different session — should not update
+    mockTmux.capturePane.mockReturnValue(
+      "some output\n  session: 99900000-1234-5678-9abc-def012345678\n",
+    );
     pollAgent(agent.id);
-    expect(mockLogs.findAgentLog).not.toHaveBeenCalled();
+    expect(getAgent(agent.id)?.claudeSessionId).toBe("abc00000-1234-5678-9abc-def012345678");
   });
 });

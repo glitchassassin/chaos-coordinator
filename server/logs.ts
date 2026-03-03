@@ -82,38 +82,6 @@ export function listLogFiles(logDir: string): string[] {
   }
 }
 
-/**
- * Find the log file most likely associated with an agent by its creation time.
- * Looks for JSONL files created within a tolerance window after agentCreatedAt.
- * Falls back to the most recently modified file if no good match.
- */
-export function findAgentLog(
-  directory: string,
-  agentCreatedAt: string,
-): string | null {
-  const logDir = findLogDir(directory);
-  if (!logDir) return null;
-  const files = listLogFiles(logDir);
-  if (files.length === 0) return null;
-
-  const createdMs = new Date(agentCreatedAt).getTime();
-  const TOLERANCE_MS = 30_000; // 30s window to account for Claude startup time
-
-  // Files created at or after the agent start, sorted oldest-first
-  const candidates = files
-    .filter((f) => {
-      try {
-        const { birthtimeMs } = fs.statSync(f);
-        return birthtimeMs >= createdMs - TOLERANCE_MS;
-      } catch {
-        return false;
-      }
-    })
-    .reverse(); // oldest first → first created after agent start
-
-  return candidates[0] ?? files[0]; // fallback to newest
-}
-
 // ── Conversation discovery ────────────────────────────────────────────────────
 
 export interface ConversationMeta {

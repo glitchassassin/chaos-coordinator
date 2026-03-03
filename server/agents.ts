@@ -1,6 +1,7 @@
 import path from "node:path";
+import os from "node:os";
 import * as tmux from "./tmux.js";
-import { findAgentLog } from "./logs.js";
+import { encodeDirectory } from "./logs.js";
 
 export interface RunningAgent {
   id: string;
@@ -167,6 +168,16 @@ export function inferStatus(
 }
 
 const IDLE_THRESHOLD_MS = 30_000;
+const SESSION_RE = /\bsession:\s+([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b/;
+
+/**
+ * Extract the Claude session ID from tmux capture-pane output.
+ * Claude Code displays `session: {uuid}` in its status line.
+ */
+export function parseSessionId(capture: string): string | null {
+  const match = SESSION_RE.exec(capture);
+  return match?.[1] ?? null;
+}
 
 /**
  * Poll a single agent: update its status based on tmux capture-pane output.
@@ -202,13 +213,20 @@ export function pollAgent(agentId: string): void {
     console.log(`[agent ${agentId.slice(0, 8)}] ${prev} → ${agent.status}`);
   }
 
-  // Discover the conversation log file once
-  if (!agent.claudeSessionId && agent.directory) {
-    const logFile = findAgentLog(agent.directory, agent.createdAt);
-    if (logFile) {
-      agent.logPath = logFile;
-      agent.claudeSessionId = path.basename(logFile, ".jsonl");
-      console.log(`[agent ${agentId.slice(0, 8)}] linked to session ${agent.claudeSessionId.slice(0, 8)}`);
+  // Discover the Claude session ID from the terminal output
+  if (!agent.claudeSessionId) {
+    const sessionId = parseSessionId(capture);
+    if (sessionId) {
+      agent.claudeSessionId = sessionId;
+      const encoded = agent.directory
+        ? encodeDirectory(agent.directory)
+        : agent.encodedDir;
+      if (encoded) {
+        agent.logPath = path.join(
+          os.homedir(), ".claude", "projects", encoded, `${sessionId}.jsonl`,
+        );
+      }
+      console.log(`[agent ${agentId.slice(0, 8)}] linked to session ${sessionId.slice(0, 8)}`);
     }
   }
 }
