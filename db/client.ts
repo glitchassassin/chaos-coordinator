@@ -24,9 +24,15 @@ let instance: Db | null = null;
 
 export function getDb(): Db {
   if (!instance) {
-    const dir = join(homedir(), ".chaos-coordinator");
-    mkdirSync(dir, { recursive: true });
-    const url = process.env.DATABASE_URL ?? join(dir, "data.db");
+    let url = process.env.DATABASE_URL;
+    if (!url) {
+      const isDev = process.env.NODE_ENV === "development";
+      const dir = isDev
+        ? join(fileURLToPath(new URL("../data", import.meta.url)))
+        : join(homedir(), ".chaos-coordinator");
+      mkdirSync(dir, { recursive: true });
+      url = join(dir, "data.db");
+    }
     instance = openDb(url);
   }
   return instance;
