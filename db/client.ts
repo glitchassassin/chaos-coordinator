@@ -9,7 +9,9 @@ import * as schema from "./schema.js";
 
 export type Db = BetterSQLite3Database<typeof schema>;
 
-const MIGRATIONS_DIR = fileURLToPath(new URL("./migrations", import.meta.url));
+// Use process.cwd() so the path survives bundling (import.meta.url would
+// point to build/server/index.js after the production build).
+const MIGRATIONS_DIR = join(process.cwd(), "db/migrations");
 
 function openDb(url: string): Db {
   const sqlite = new Database(url);

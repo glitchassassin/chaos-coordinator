@@ -3,18 +3,20 @@ import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { createRequestHandler, type ServerBuild } from "react-router";
 import { getDb } from "../db/client.js";
+import { reconcileAgents, startPolling } from "./agents.js";
 
 const BUILD_PATH = "../build/server/index.js";
 const PORT = Number(process.env.PORT ?? 5173);
 
-// Initialize DB and run migrations before accepting requests
+// Initialize DB, reconcile existing tmux sessions, and start status polling
 getDb();
+reconcileAgents();
+startPolling();
 
 const app = new Hono();
 
-// Serve static client assets
-app.use("/assets/*", serveStatic({ root: "./build/client" }));
-app.use("/favicon.ico", serveStatic({ path: "./build/client/favicon.ico" }));
+// Serve all static client assets (falls through to React Router for non-files)
+app.use(serveStatic({ root: "./build/client" }));
 
 // React Router handler (loaded at startup)
 const build = (await import(BUILD_PATH)) as ServerBuild;

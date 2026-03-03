@@ -34,20 +34,26 @@ export function addProject(directory: string, db: Db = getDb()): Project {
   const remoteUrl = getRemoteUrl(directory);
   const remoteInfo = remoteUrl ? parseRemoteUrl(remoteUrl) : null;
   const name = remoteInfo ? `${remoteInfo.owner}/${remoteInfo.repo}` : basename(directory);
+  const fields = {
+    name,
+    remoteUrl,
+    providerType: remoteInfo?.providerType ?? null,
+    owner: remoteInfo?.owner ?? null,
+    repo: remoteInfo?.repo ?? null,
+  };
+
+  // Restore a previously removed project rather than hitting the unique constraint.
+  const existing = db.select().from(projects).where(eq(projects.directory, directory)).get();
+  if (existing) {
+    db.update(projects)
+      .set({ ...fields, removedAt: null })
+      .where(eq(projects.id, existing.id))
+      .run();
+    return db.select().from(projects).where(eq(projects.id, existing.id)).get()!;
+  }
 
   const id = crypto.randomUUID();
-  db.insert(projects)
-    .values({
-      id,
-      name,
-      directory,
-      remoteUrl,
-      providerType: remoteInfo?.providerType ?? null,
-      owner: remoteInfo?.owner ?? null,
-      repo: remoteInfo?.repo ?? null,
-    })
-    .run();
-
+  db.insert(projects).values({ id, directory, ...fields }).run();
   return db.select().from(projects).where(eq(projects.id, id)).get()!;
 }
 

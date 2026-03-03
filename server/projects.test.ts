@@ -93,9 +93,20 @@ describe("addProject", () => {
     }
   });
 
-  it("throws on duplicate directory", () => {
-    addProject(tempDir, db);
-    expect(() => addProject(tempDir, db)).toThrow();
+  it("returns the existing project when the same directory is added twice", () => {
+    const a = addProject(tempDir, db);
+    const b = addProject(tempDir, db);
+    expect(b.id).toBe(a.id);
+  });
+
+  it("restores a removed project when its directory is re-added", () => {
+    const original = addProject(tempDir, db);
+    removeProject(original.id, db);
+    expect(listProjects(db)).toHaveLength(0);
+    const restored = addProject(tempDir, db);
+    expect(restored.id).toBe(original.id);
+    expect(restored.removedAt).toBeNull();
+    expect(listProjects(db)).toHaveLength(1);
   });
 });
 
