@@ -79,6 +79,19 @@ export function listSessions(): string[] {
   }
 }
 
+/** Return the current working directory of a tmux pane. Returns empty string on failure. */
+export function paneCwd(session: string): string {
+  try {
+    return execFileSync(
+      "tmux",
+      ["display-message", "-p", "-t", session, "#{pane_current_path}"],
+      { encoding: "utf8", timeout: 5_000 },
+    ).trim();
+  } catch {
+    return "";
+  }
+}
+
 /** Return true if the named tmux session currently exists. */
 export function sessionExists(session: string): boolean {
   try {

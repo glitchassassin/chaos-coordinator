@@ -192,6 +192,11 @@ export function ConversationLog({ initialEntries, sessionId, encodedDir, agentId
   const [entries, setEntries] = useState<LogEntry[]>(initialEntries);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // Sync entries when loader data changes (e.g. after revalidation / polling)
+  useEffect(() => {
+    setEntries(initialEntries);
+  }, [initialEntries]);
+
   // WebSocket live updates — only connect if we have an agentId (running agent)
   useEffect(() => {
     if (!agentId) return;

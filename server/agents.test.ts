@@ -7,6 +7,7 @@ vi.mock("./tmux.js", () => ({
   killSession: vi.fn(),
   listSessions: vi.fn().mockReturnValue([]),
   sessionExists: vi.fn().mockReturnValue(true),
+  paneCwd: vi.fn().mockReturnValue(""),
 }));
 
 vi.mock("./logs.js", () => ({
@@ -38,6 +39,7 @@ beforeEach(() => {
   mockTmux.killSession.mockReset();
   mockTmux.listSessions.mockReturnValue([]);
   mockTmux.sessionExists.mockReturnValue(true);
+  mockTmux.paneCwd.mockReturnValue("");
 });
 
 describe("parseSessionId", () => {
@@ -214,9 +216,22 @@ describe("reconcileAgents", () => {
 
   it("adopts orphan orch-* sessions", () => {
     mockTmux.listSessions.mockReturnValue(["orch-orphan-123"]);
+    mockTmux.paneCwd.mockReturnValue("/tmp/my-project");
     reconcileAgents();
-    expect(getAgent("orphan-123")).toBeDefined();
-    expect(getAgent("orphan-123")?.tmuxSession).toBe("orch-orphan-123");
+    const agent = getAgent("orphan-123");
+    expect(agent).toBeDefined();
+    expect(agent?.tmuxSession).toBe("orch-orphan-123");
+    expect(agent?.directory).toBe("/tmp/my-project");
+    expect(agent?.encodedDir).toBe("-tmp-my-project");
+  });
+
+  it("handles empty paneCwd gracefully", () => {
+    mockTmux.listSessions.mockReturnValue(["orch-orphan-456"]);
+    mockTmux.paneCwd.mockReturnValue("");
+    reconcileAgents();
+    const agent = getAgent("orphan-456");
+    expect(agent?.directory).toBe("");
+    expect(agent?.encodedDir).toBe("");
   });
 });
 
@@ -256,6 +271,21 @@ describe("pollAgent", () => {
     pollAgent(agent.id);
     expect(getAgent(agent.id)?.claudeSessionId).toBe("abc00000-1234-5678-9abc-def012345678");
     expect(getAgent(agent.id)?.logPath).toContain("abc00000-1234-5678-9abc-def012345678.jsonl");
+  });
+
+  it("backfills directory and encodedDir from paneCwd when empty", () => {
+    mockTmux.listSessions.mockReturnValue(["orch-orphan-789"]);
+    mockTmux.paneCwd.mockReturnValue("");
+    reconcileAgents();
+    const agent = getAgent("orphan-789");
+    expect(agent?.directory).toBe("");
+
+    // Now paneCwd returns a value on subsequent poll
+    mockTmux.paneCwd.mockReturnValue("/tmp/discovered");
+    mockTmux.capturePane.mockReturnValue("some output\n");
+    pollAgent("orphan-789");
+    expect(agent?.directory).toBe("/tmp/discovered");
+    expect(agent?.encodedDir).toBe("-tmp-discovered");
   });
 
   it("does not re-discover session once claudeSessionId is set", () => {

@@ -3,7 +3,7 @@ import { Form, redirect, useSubmit } from "react-router";
 import type { Route } from "./+types/projects.$encodedDir.conversations.$sessionId";
 import { useDoubleCheck } from "~/utils/misc";
 import { getProject } from "../../server/projects.js";
-import { listAgents, sendInput, terminateAgent, readScreen } from "../../server/agents.js";
+import { listAgents, sendInput, terminateAgent } from "../../server/agents.js";
 import { readLog } from "../../server/logs.js";
 import { ConversationLog } from "~/components/ConversationLog";
 import path from "node:path";
@@ -32,16 +32,7 @@ export function loader({ params }: Route.LoaderArgs) {
   const agents = listAgents(project.encodedDir);
   const runningAgent = agents.find((a) => a.claudeSessionId === sessionId) ?? null;
 
-  let screen = "";
-  if (runningAgent) {
-    try {
-      screen = readScreen(runningAgent.id);
-    } catch {
-      /* agent may have just terminated */
-    }
-  }
-
-  return { project, sessionId, entries, runningAgent, screen };
+  return { project, sessionId, entries, runningAgent };
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
@@ -195,7 +186,7 @@ function SendMessageForm({ agentId, sendError }: { agentId: string; sendError?: 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function ConversationView({ loaderData, actionData }: Route.ComponentProps) {
-  const { project, sessionId, entries, runningAgent, screen } = loaderData;
+  const { project, sessionId, entries, runningAgent } = loaderData;
   const sendError =
     actionData && "error" in actionData ? (actionData as { error: string }).error : undefined;
   const dc = useDoubleCheck();
@@ -286,30 +277,11 @@ export default function ConversationView({ loaderData, actionData }: Route.Compo
         />
       </section>
 
-      {/* Terminal capture */}
+      {/* Debug: tmux attach command */}
       {runningAgent && (
-        <section style={{ marginBottom: "2rem" }}>
-          <details>
-            <summary style={{ cursor: "pointer", fontWeight: 600, padding: "0.25rem 0" }}>
-              Terminal
-            </summary>
-            <pre
-              style={{
-                border: "1px solid #cccccc",
-                padding: "0.75rem",
-                fontSize: "0.8125rem",
-                fontFamily: "monospace",
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-                overflowY: "auto",
-                maxHeight: 400,
-                marginTop: "0.5rem",
-              }}
-            >
-              {screen || "(no output)"}
-            </pre>
-          </details>
-        </section>
+        <p style={{ fontSize: "0.75rem", color: "#888888", fontFamily: "monospace" }}>
+          tmux attach -t {runningAgent.tmuxSession}
+        </p>
       )}
 
       {/* Send input */}

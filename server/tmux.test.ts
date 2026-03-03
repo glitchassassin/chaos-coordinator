@@ -14,6 +14,7 @@ import {
   killSession,
   listSessions,
   sessionExists,
+  paneCwd,
 } from "./tmux.js";
 
 const mockExec = vi.mocked(execFileSync);
@@ -164,6 +165,25 @@ describe("listSessions", () => {
       throw new Error("no server running");
     });
     expect(listSessions()).toEqual([]);
+  });
+});
+
+describe("paneCwd", () => {
+  it("returns trimmed pane current path", () => {
+    mockExec.mockReturnValue("/tmp/my-project\n");
+    expect(paneCwd("orch-abc")).toBe("/tmp/my-project");
+    expect(mockExec).toHaveBeenCalledWith(
+      "tmux",
+      ["display-message", "-p", "-t", "orch-abc", "#{pane_current_path}"],
+      expect.objectContaining({ encoding: "utf8" }),
+    );
+  });
+
+  it("returns empty string when session does not exist", () => {
+    mockExec.mockImplementation(() => {
+      throw new Error("no session");
+    });
+    expect(paneCwd("orch-missing")).toBe("");
   });
 });
 
