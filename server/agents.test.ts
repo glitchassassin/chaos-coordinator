@@ -1,8 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { eq } from "drizzle-orm";
-import { mkdirSync, rmdirSync } from "fs";
-import { join } from "path";
-import { tmpdir } from "os";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("./tmux.js", () => ({
   createSession: vi.fn(),
@@ -14,8 +10,6 @@ vi.mock("./tmux.js", () => ({
 }));
 
 import * as tmux from "./tmux.js";
-import { createTestDb } from "../db/client.js";
-import { projects } from "../db/schema.js";
 import {
   launchAgent,
   sendInput,
@@ -26,23 +20,20 @@ import {
   reconcileAgents,
   pollAgent,
   inferStatus,
+  _clearAgents,
 } from "./agents.js";
 
 const mockTmux = vi.mocked(tmux);
 
-function makeTempDir(): string {
-  const dir = join(tmpdir(), `chaos-test-${crypto.randomUUID()}`);
-  mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
-function seedProject(db: ReturnType<typeof createTestDb>, directory: string) {
-  const id = crypto.randomUUID();
-  db.insert(projects)
-    .values({ id, name: "test-project", directory, createdAt: new Date().toISOString() })
-    .run();
-  return id;
-}
+beforeEach(() => {
+  _clearAgents();
+  mockTmux.createSession.mockReset();
+  mockTmux.sendInput.mockReset();
+  mockTmux.capturePane.mockReturnValue("");
+  mockTmux.killSession.mockReset();
+  mockTmux.listSessions.mockReturnValue([]);
+  mockTmux.sessionExists.mockReturnValue(true);
+});
 
 describe("inferStatus", () => {
   it("returns 'active' for normal output", () => {
@@ -67,310 +58,161 @@ describe("inferStatus", () => {
 });
 
 describe("launchAgent", () => {
-  let db: ReturnType<typeof createTestDb>;
-  let tempDir: string;
-  let projectId: string;
-
-  beforeEach(() => {
-    db = createTestDb();
-    tempDir = makeTempDir();
-    projectId = seedProject(db, tempDir);
-    mockTmux.createSession.mockReset();
-    mockTmux.sendInput.mockReset();
-  });
-
-  afterEach(() => {
-    rmdirSync(tempDir);
-  });
-
   it("creates a tmux session named orch-{id}", () => {
-    const agent = launchAgent(projectId, undefined, db);
+    const agent = launchAgent("enc-dir", "/tmp/test");
     expect(mockTmux.createSession).toHaveBeenCalledWith(
       `orch-${agent.id}`,
-      tempDir,
+      "/tmp/test",
       "claude",
     );
     expect(agent.tmuxSession).toBe(`orch-${agent.id}`);
   });
 
-  it("inserts agent with status 'starting'", () => {
-    const agent = launchAgent(projectId, undefined, db);
+  it("creates agent with status 'starting'", () => {
+    const agent = launchAgent("enc-dir", "/tmp/test");
     expect(agent.status).toBe("starting");
-    expect(agent.projectId).toBe(projectId);
-    expect(agent.endedAt).toBeNull();
+    expect(agent.encodedDir).toBe("enc-dir");
+    expect(agent.directory).toBe("/tmp/test");
   });
 
   it("sends initial prompt when provided", () => {
     const prompt = "Fix the bug in main.ts";
-    launchAgent(projectId, prompt, db);
+    launchAgent("enc-dir", "/tmp/test", prompt);
     expect(mockTmux.sendInput).toHaveBeenCalledWith(expect.stringMatching(/^orch-/), prompt);
   });
 
   it("does not call sendInput when no prompt", () => {
-    launchAgent(projectId, undefined, db);
+    launchAgent("enc-dir", "/tmp/test");
     expect(mockTmux.sendInput).not.toHaveBeenCalled();
   });
 
   it("does not call sendInput for blank prompt", () => {
-    launchAgent(projectId, "   ", db);
+    launchAgent("enc-dir", "/tmp/test", "   ");
     expect(mockTmux.sendInput).not.toHaveBeenCalled();
   });
 
-  it("throws when project does not exist", () => {
-    expect(() => launchAgent("nonexistent", undefined, db)).toThrow("Project not found");
-  });
-
-  it("throws when project is soft-deleted", () => {
-    db.update(projects)
-      .set({ removedAt: new Date().toISOString() })
-      .where(eq(projects.id, projectId))
-      .run();
-    expect(() => launchAgent(projectId, undefined, db)).toThrow("removed");
-  });
-
   it("assigns unique IDs to each agent", () => {
-    const a = launchAgent(projectId, undefined, db);
-    const b = launchAgent(projectId, undefined, db);
+    const a = launchAgent("enc-dir", "/tmp/test");
+    const b = launchAgent("enc-dir", "/tmp/test");
     expect(a.id).not.toBe(b.id);
     expect(a.tmuxSession).not.toBe(b.tmuxSession);
   });
 });
 
 describe("sendInput", () => {
-  let db: ReturnType<typeof createTestDb>;
-  let tempDir: string;
-  let projectId: string;
-
-  beforeEach(() => {
-    db = createTestDb();
-    tempDir = makeTempDir();
-    projectId = seedProject(db, tempDir);
-    mockTmux.createSession.mockReset();
-    mockTmux.sendInput.mockReset();
-  });
-
-  afterEach(() => {
-    rmdirSync(tempDir);
-  });
-
   it("sends text to the agent's tmux session", () => {
-    const agent = launchAgent(projectId, undefined, db);
+    const agent = launchAgent("enc-dir", "/tmp/test");
     mockTmux.sendInput.mockReset();
-    sendInput(agent.id, "hello", db);
+    sendInput(agent.id, "hello");
     expect(mockTmux.sendInput).toHaveBeenCalledWith(agent.tmuxSession, "hello");
   });
 
   it("throws when agent does not exist", () => {
-    expect(() => { sendInput("nonexistent", "hi", db); }).toThrow("Agent not found");
-  });
-
-  it("throws when agent is terminated", () => {
-    const agent = launchAgent(projectId, undefined, db);
-    terminateAgent(agent.id, db);
-    expect(() => { sendInput(agent.id, "hi", db); }).toThrow("terminated");
+    expect(() => { sendInput("nonexistent", "hi"); }).toThrow("Agent not found");
   });
 });
 
 describe("readScreen", () => {
-  let db: ReturnType<typeof createTestDb>;
-  let tempDir: string;
-  let projectId: string;
-
-  beforeEach(() => {
-    db = createTestDb();
-    tempDir = makeTempDir();
-    projectId = seedProject(db, tempDir);
-    mockTmux.createSession.mockReset();
-    mockTmux.capturePane.mockReturnValue("screen content\n");
-  });
-
-  afterEach(() => {
-    rmdirSync(tempDir);
-  });
-
   it("returns captured pane output", () => {
-    const agent = launchAgent(projectId, undefined, db);
-    const screen = readScreen(agent.id, db);
+    mockTmux.capturePane.mockReturnValue("screen content\n");
+    const agent = launchAgent("enc-dir", "/tmp/test");
+    const screen = readScreen(agent.id);
     expect(screen).toBe("screen content\n");
     expect(mockTmux.capturePane).toHaveBeenCalledWith(agent.tmuxSession);
   });
 
   it("throws when agent does not exist", () => {
-    expect(() => readScreen("nonexistent", db)).toThrow("Agent not found");
+    expect(() => readScreen("nonexistent")).toThrow("Agent not found");
   });
 });
 
 describe("terminateAgent", () => {
-  let db: ReturnType<typeof createTestDb>;
-  let tempDir: string;
-  let projectId: string;
-
-  beforeEach(() => {
-    db = createTestDb();
-    tempDir = makeTempDir();
-    projectId = seedProject(db, tempDir);
-    mockTmux.createSession.mockReset();
-    mockTmux.killSession.mockReset();
-    mockTmux.sendInput.mockReset();
-  });
-
-  afterEach(() => {
-    rmdirSync(tempDir);
-  });
-
   it("sends /exit then kills the tmux session", () => {
-    const agent = launchAgent(projectId, undefined, db);
+    const agent = launchAgent("enc-dir", "/tmp/test");
     mockTmux.sendInput.mockReset();
-    terminateAgent(agent.id, db);
+    terminateAgent(agent.id);
     expect(mockTmux.sendInput).toHaveBeenCalledWith(agent.tmuxSession, "/exit");
     expect(mockTmux.killSession).toHaveBeenCalledWith(agent.tmuxSession);
   });
 
-  it("marks agent as terminated with endedAt set", () => {
-    const agent = launchAgent(projectId, undefined, db);
-    terminateAgent(agent.id, db);
-    expect(getAgent(agent.id, db)?.status).toBe("terminated");
-    expect(getAgent(agent.id, db)?.endedAt).not.toBeNull();
+  it("removes agent from store after termination", () => {
+    const agent = launchAgent("enc-dir", "/tmp/test");
+    terminateAgent(agent.id);
+    expect(getAgent(agent.id)).toBeUndefined();
   });
 
   it("is a no-op for an unknown agent id", () => {
-    expect(() => { terminateAgent("nonexistent", db); }).not.toThrow();
-  });
-
-  it("skips send-keys/kill when already terminated", () => {
-    const agent = launchAgent(projectId, undefined, db);
-    terminateAgent(agent.id, db);
-    mockTmux.killSession.mockReset();
-    mockTmux.sendInput.mockReset();
-    terminateAgent(agent.id, db);
-    expect(mockTmux.killSession).not.toHaveBeenCalled();
-    expect(mockTmux.sendInput).not.toHaveBeenCalled();
+    expect(() => { terminateAgent("nonexistent"); }).not.toThrow();
   });
 });
 
 describe("listAgents", () => {
-  let db: ReturnType<typeof createTestDb>;
-  let tempDir: string;
-  let projectId: string;
-
-  beforeEach(() => {
-    db = createTestDb();
-    tempDir = makeTempDir();
-    projectId = seedProject(db, tempDir);
-    mockTmux.createSession.mockReset();
-  });
-
-  afterEach(() => {
-    rmdirSync(tempDir);
-  });
-
   it("returns empty array when no agents", () => {
-    expect(listAgents(undefined, db)).toEqual([]);
+    expect(listAgents()).toEqual([]);
   });
 
   it("returns all agents", () => {
-    launchAgent(projectId, undefined, db);
-    launchAgent(projectId, undefined, db);
-    expect(listAgents(undefined, db)).toHaveLength(2);
+    launchAgent("enc-dir", "/tmp/test");
+    launchAgent("enc-dir", "/tmp/test");
+    expect(listAgents()).toHaveLength(2);
   });
 
-  it("filters by projectId", () => {
-    const dir2 = makeTempDir();
-    const pid2 = seedProject(db, dir2);
-    try {
-      launchAgent(projectId, undefined, db);
-      launchAgent(pid2, undefined, db);
-      expect(listAgents(projectId, db)).toHaveLength(1);
-      expect(listAgents(pid2, db)).toHaveLength(1);
-    } finally {
-      rmdirSync(dir2);
-    }
+  it("filters by encodedDir", () => {
+    launchAgent("dir-a", "/tmp/a");
+    launchAgent("dir-b", "/tmp/b");
+    expect(listAgents("dir-a")).toHaveLength(1);
+    expect(listAgents("dir-b")).toHaveLength(1);
   });
 });
 
 describe("reconcileAgents", () => {
-  let db: ReturnType<typeof createTestDb>;
-  let tempDir: string;
-  let projectId: string;
-
-  beforeEach(() => {
-    db = createTestDb();
-    tempDir = makeTempDir();
-    projectId = seedProject(db, tempDir);
-    mockTmux.createSession.mockReset();
+  it("removes agents when their session is gone", () => {
+    const agent = launchAgent("enc-dir", "/tmp/test");
     mockTmux.listSessions.mockReturnValue([]);
+    reconcileAgents();
+    expect(getAgent(agent.id)).toBeUndefined();
   });
 
-  afterEach(() => {
-    rmdirSync(tempDir);
-  });
-
-  it("marks agents as terminated when their session is gone", () => {
-    const agent = launchAgent(projectId, undefined, db);
-    mockTmux.listSessions.mockReturnValue([]);
-    reconcileAgents(db);
-    expect(getAgent(agent.id, db)?.status).toBe("terminated");
-  });
-
-  it("leaves agents alone when their session still exists", () => {
-    const agent = launchAgent(projectId, undefined, db);
+  it("keeps agents when their session still exists", () => {
+    const agent = launchAgent("enc-dir", "/tmp/test");
     mockTmux.listSessions.mockReturnValue([agent.tmuxSession]);
-    reconcileAgents(db);
-    expect(getAgent(agent.id, db)?.status).toBe("starting");
+    reconcileAgents();
+    expect(getAgent(agent.id)).toBeDefined();
   });
 
-  it("does not re-terminate already terminated agents", () => {
-    const agent = launchAgent(projectId, undefined, db);
-    terminateAgent(agent.id, db);
-    const before = getAgent(agent.id, db)?.endedAt;
-    reconcileAgents(db);
-    expect(getAgent(agent.id, db)?.endedAt).toBe(before);
+  it("adopts orphan orch-* sessions", () => {
+    mockTmux.listSessions.mockReturnValue(["orch-orphan-123"]);
+    reconcileAgents();
+    expect(getAgent("orphan-123")).toBeDefined();
+    expect(getAgent("orphan-123")?.tmuxSession).toBe("orch-orphan-123");
   });
 });
 
 describe("pollAgent", () => {
-  let db: ReturnType<typeof createTestDb>;
-  let tempDir: string;
-  let projectId: string;
-
-  beforeEach(() => {
-    db = createTestDb();
-    tempDir = makeTempDir();
-    projectId = seedProject(db, tempDir);
-    mockTmux.createSession.mockReset();
-    mockTmux.sessionExists.mockReturnValue(true);
-    mockTmux.capturePane.mockReturnValue("some output\n");
-  });
-
-  afterEach(() => {
-    rmdirSync(tempDir);
-  });
-
   it("sets status to active on first poll", () => {
-    const agent = launchAgent(projectId, undefined, db);
-    pollAgent(agent.id, db);
-    expect(getAgent(agent.id, db)?.status).toBe("active");
+    mockTmux.capturePane.mockReturnValue("some output\n");
+    const agent = launchAgent("enc-dir", "/tmp/test");
+    pollAgent(agent.id);
+    expect(getAgent(agent.id)?.status).toBe("active");
   });
 
   it("sets status to waiting when output contains a prompt", () => {
     mockTmux.capturePane.mockReturnValue("Do you want to proceed? (y/N)");
-    const agent = launchAgent(projectId, undefined, db);
-    pollAgent(agent.id, db);
-    expect(getAgent(agent.id, db)?.status).toBe("waiting");
+    const agent = launchAgent("enc-dir", "/tmp/test");
+    pollAgent(agent.id);
+    expect(getAgent(agent.id)?.status).toBe("waiting");
   });
 
-  it("terminates agent when session disappears", () => {
+  it("removes agent when session disappears", () => {
     mockTmux.sessionExists.mockReturnValue(false);
-    const agent = launchAgent(projectId, undefined, db);
-    pollAgent(agent.id, db);
-    expect(getAgent(agent.id, db)?.status).toBe("terminated");
+    const agent = launchAgent("enc-dir", "/tmp/test");
+    pollAgent(agent.id);
+    expect(getAgent(agent.id)).toBeUndefined();
   });
 
-  it("is a no-op for terminated agents", () => {
-    const agent = launchAgent(projectId, undefined, db);
-    terminateAgent(agent.id, db);
+  it("is a no-op for unknown agent ids", () => {
     mockTmux.capturePane.mockClear();
-    pollAgent(agent.id, db);
+    pollAgent("nonexistent");
     expect(mockTmux.capturePane).not.toHaveBeenCalled();
   });
 });

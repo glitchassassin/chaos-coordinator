@@ -1,8 +1,6 @@
-import { Form, redirect } from "react-router";
 import type { Route } from "./+types/home";
-import { useDoubleCheck } from "~/utils/misc";
-import { listProjects, addProject, removeProject } from "../../server/projects.js";
-import { listAgents, launchAgent, terminateAgent } from "../../server/agents.js";
+import { listProjects } from "../../server/projects.js";
+import { listAgents, type RunningAgent } from "../../server/agents.js";
 
 export function meta(_args: Route.MetaArgs) {
   return [
@@ -16,49 +14,6 @@ export function loader(_args: Route.LoaderArgs) {
     projects: listProjects(),
     agents: listAgents(),
   };
-}
-
-export async function action({ request }: Route.ActionArgs) {
-  const form = await request.formData();
-  const intent = form.get("intent");
-
-  if (intent === "add") {
-    const directory = (form.get("directory") as string | null)?.trim() ?? "";
-    if (!directory) {
-      return { intent: "add" as const, error: "Directory path is required." };
-    }
-    try {
-      addProject(directory);
-      return { intent: "add" as const, ok: true as const, ts: Date.now() };
-    } catch (err) {
-      return { intent: "add" as const, error: (err as Error).message };
-    }
-  }
-
-  if (intent === "remove") {
-    const id = form.get("id") as string;
-    removeProject(id);
-    return { intent: "remove" as const, ok: true as const };
-  }
-
-  if (intent === "launch") {
-    const projectId = form.get("projectId") as string;
-    const initialPrompt = (form.get("initialPrompt") as string | null)?.trim() || undefined;
-    try {
-      const agent = launchAgent(projectId, initialPrompt);
-      return redirect(`/agents/${agent.id}`);
-    } catch (err) {
-      return { intent: "launch" as const, error: (err as Error).message, projectId };
-    }
-  }
-
-  if (intent === "terminate") {
-    const id = form.get("id") as string;
-    terminateAgent(id);
-    return { intent: "terminate" as const, ok: true as const };
-  }
-
-  return null;
 }
 
 // ── Provider icons ─────────────────────────────────────────────────────────────
@@ -114,7 +69,6 @@ function ProviderIcon({ type }: { type: string }) {
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 type Project = Awaited<ReturnType<typeof loader>>["projects"][number];
-type Agent = Awaited<ReturnType<typeof loader>>["agents"][number];
 
 // ── Status badge ───────────────────────────────────────────────────────────────
 
@@ -123,7 +77,6 @@ const STATUS_COLOR: Record<string, string> = {
   idle: "#555555",
   waiting: "#f57f17",
   starting: "#555555",
-  terminated: "#c62828",
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -146,122 +99,26 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-// ── Agent row ──────────────────────────────────────────────────────────────────
+// ── Agent summary ──────────────────────────────────────────────────────────────
 
-function AgentRow({ agent }: { agent: Agent }) {
-  const dc = useDoubleCheck();
-  const alive = agent.status !== "terminated";
-  const age = (() => {
-    const ms = Date.now() - new Date(agent.createdAt).getTime();
-    const m = Math.floor(ms / 60_000);
-    if (m < 60) return `${m}m`;
-    return `${Math.floor(m / 60)}h ${m % 60}m`;
-  })();
-
+function AgentSummary({ agents }: { agents: RunningAgent[] }) {
+  if (agents.length === 0) return null;
   return (
     <div
       style={{
         display: "flex",
-        alignItems: "center",
         gap: "0.5rem",
-        padding: "0.375rem 0",
-        fontSize: "0.875rem",
+        alignItems: "center",
         flexWrap: "wrap",
       }}
     >
-      <StatusBadge status={agent.status} />
-      <span style={{ color: "#555555" }}>{age} ago</span>
-      <div style={{ marginLeft: "auto", display: "flex", gap: "0.5rem" }}>
-        <a
-          href={`/agents/${agent.id}`}
-          style={{
-            padding: "0.25rem 0.625rem",
-            border: "2px solid #1565c0",
-            color: "#1565c0",
-            textDecoration: "none",
-            fontSize: "0.8125rem",
-            display: "inline-block",
-            minHeight: 32,
-            lineHeight: "1.5",
-          }}
-        >
-          View
-        </a>
-        {alive && (
-          <Form method="post" style={{ display: "inline" }}>
-            <input type="hidden" name="intent" value="terminate" />
-            <input type="hidden" name="id" value={agent.id} />
-            <button
-              type="submit"
-              {...dc.getButtonProps()}
-              style={{
-                padding: "0.25rem 0.625rem",
-                border: "2px solid #c62828",
-                color: "#c62828",
-                background: "none",
-                cursor: "pointer",
-                fontSize: "0.8125rem",
-                minHeight: 32,
-              }}
-            >
-              {dc.doubleCheck ? "Confirm?" : "Terminate"}
-            </button>
-          </Form>
-        )}
-      </div>
+      {agents.map((a) => (
+        <StatusBadge key={a.id} status={a.status} />
+      ))}
+      <span style={{ color: "#555555", fontSize: "0.8125rem" }}>
+        {agents.length} running agent{agents.length !== 1 ? "s" : ""}
+      </span>
     </div>
-  );
-}
-
-// ── Launch agent form ──────────────────────────────────────────────────────────
-
-function LaunchAgentForm({
-  projectId,
-  launchError,
-}: {
-  projectId: string;
-  launchError?: string;
-}) {
-  return (
-    <Form method="post" style={{ marginTop: "0.5rem" }}>
-      <input type="hidden" name="intent" value="launch" />
-      <input type="hidden" name="projectId" value={projectId} />
-      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-        <input
-          type="text"
-          name="initialPrompt"
-          placeholder="Initial prompt (optional)"
-          style={{
-            flex: 1,
-            minWidth: 160,
-            padding: "0 0.625rem",
-            border: "2px solid #888888",
-            background: "none",
-            fontSize: "0.875rem",
-            height: 36,
-          }}
-        />
-        <button
-          type="submit"
-          style={{
-            padding: "0 0.875rem",
-            border: "2px solid #2e7d32",
-            color: "#2e7d32",
-            background: "none",
-            cursor: "pointer",
-            fontSize: "0.875rem",
-            height: 36,
-          }}
-        >
-          + New Agent
-        </button>
-      </div>
-      {launchError && (
-        <p role="alert" style={{ color: "#c62828", margin: "0.25rem 0 0", fontSize: "0.8125rem" }}>
-          {launchError}
-        </p>
-      )}
-    </Form>
   );
 }
 
@@ -270,22 +127,25 @@ function LaunchAgentForm({
 function ProjectRow({
   project,
   agents,
-  launchError,
 }: {
   project: Project;
-  agents: Agent[];
-  launchError?: string;
+  agents: RunningAgent[];
 }) {
-  const dc = useDoubleCheck();
-  const liveAgents = agents.filter((a) => a.status !== "terminated");
-  const deadAgents = agents.filter((a) => a.status === "terminated");
-
   return (
-    <div className="border-t-ui" data-testid="project-row" data-dir={project.directory}>
-      {/* Project header */}
+    <a
+      href={`/projects/${project.encodedDir}`}
+      data-testid="project-row"
+      data-dir={project.directory}
+      className="border-t-ui"
+      style={{
+        display: "block",
+        padding: "0.75rem 0",
+        textDecoration: "none",
+        color: "inherit",
+      }}
+    >
       <div
         style={{
-          padding: "0.75rem 0",
           display: "flex",
           alignItems: "flex-start",
           gap: "0.75rem",
@@ -303,154 +163,43 @@ function ProjectRow({
           >
             {project.directory}
           </div>
+          <div style={{ marginTop: "0.375rem" }}>
+            <AgentSummary agents={agents} />
+          </div>
         </div>
-
-        <Form method="post" style={{ flexShrink: 0 }}>
-          <input type="hidden" name="intent" value="remove" />
-          <input type="hidden" name="id" value={project.id} />
-          <button
-            type="submit"
-            {...dc.getButtonProps()}
-            style={{
-              padding: "0 0.75rem",
-              border: "3px solid #c62828",
-              background: "#c62828",
-              color: "#ffffff",
-              cursor: "pointer",
-              height: 44,
-            }}
-          >
-            {dc.doubleCheck ? "Confirm?" : "Remove"}
-          </button>
-        </Form>
       </div>
-
-      {/* Active agents */}
-      {liveAgents.length > 0 && (
-        <div
-          style={{
-            paddingLeft: "2rem",
-            paddingBottom: "0.25rem",
-            borderLeft: "2px solid #cccccc",
-            marginLeft: "0.75rem",
-            marginBottom: "0.25rem",
-          }}
-        >
-          {liveAgents.map((a) => (
-            <AgentRow key={a.id} agent={a} />
-          ))}
-        </div>
-      )}
-
-      {/* Terminated agents (collapsed) */}
-      {deadAgents.length > 0 && (
-        <div style={{ paddingLeft: "2rem", marginBottom: "0.25rem" }}>
-          <details>
-            <summary
-              style={{ color: "#555555", fontSize: "0.8125rem", cursor: "pointer" }}
-            >
-              {deadAgents.length} terminated agent{deadAgents.length !== 1 ? "s" : ""}
-            </summary>
-            <div style={{ paddingLeft: "1rem" }}>
-              {deadAgents.map((a) => (
-                <AgentRow key={a.id} agent={a} />
-              ))}
-            </div>
-          </details>
-        </div>
-      )}
-
-      {/* Launch form */}
-      <div style={{ paddingLeft: "2rem", paddingBottom: "0.75rem" }}>
-        <LaunchAgentForm projectId={project.id} launchError={launchError} />
-      </div>
-    </div>
-  );
-}
-
-// ── Add Project form ───────────────────────────────────────────────────────────
-
-function AddProjectForm({ formKey, error }: { formKey: number; error?: string }) {
-  return (
-    <Form method="post" key={formKey} style={{ marginBottom: "1.5rem" }}>
-      <input type="hidden" name="intent" value="add" />
-      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-        <input
-          type="text"
-          name="directory"
-          placeholder="Absolute path to project directory"
-          required
-          aria-label="Project directory path"
-          style={{
-            flex: 1,
-            minWidth: 200,
-            padding: "0 0.75rem",
-            border: "3px solid #888888",
-            background: "none",
-          }}
-        />
-        <button
-          type="submit"
-          style={{
-            padding: "0 1rem",
-            border: "3px solid #888888",
-            background: "none",
-            cursor: "pointer",
-          }}
-        >
-          Add Project
-        </button>
-      </div>
-      {error && (
-        <p role="alert" style={{ color: "#c62828", margin: "0.5rem 0 0", fontSize: "0.875rem" }}>
-          {error}
-        </p>
-      )}
-    </Form>
+    </a>
   );
 }
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function Home({ loaderData, actionData }: Route.ComponentProps) {
+export default function Home({ loaderData }: Route.ComponentProps) {
   const { projects, agents } = loaderData;
 
-  const addError =
-    actionData?.intent === "add" && "error" in actionData ? actionData.error : undefined;
-  const formKey =
-    actionData?.intent === "add" && "ts" in actionData ? actionData.ts : 0;
-
-  const launchErrorProjectId =
-    actionData?.intent === "launch" && "projectId" in actionData
-      ? actionData.projectId
-      : undefined;
-  const launchError =
-    actionData?.intent === "launch" && "error" in actionData ? actionData.error : undefined;
-
-  // Group agents by projectId
-  const agentsByProject = new Map<string, Agent[]>();
+  // Group agents by encodedDir
+  const agentsByDir = new Map<string, RunningAgent[]>();
   for (const agent of agents) {
-    const list = agentsByProject.get(agent.projectId) ?? [];
+    const list = agentsByDir.get(agent.encodedDir) ?? [];
     list.push(agent);
-    agentsByProject.set(agent.projectId, list);
+    agentsByDir.set(agent.encodedDir, list);
   }
 
   return (
     <main style={{ maxWidth: 800, margin: "0 auto", padding: "2rem 1rem" }}>
       <h1 style={{ fontSize: "1.5rem", marginBottom: "1.5rem" }}>Projects</h1>
 
-      <AddProjectForm formKey={formKey} error={addError} />
-
       {projects.length === 0 ? (
-        <p style={{ color: "#555555" }}>No projects yet. Add a directory above.</p>
+        <p style={{ color: "#555555" }}>
+          No projects found. Claude Code conversations will appear here automatically.
+        </p>
       ) : (
         <div>
           {projects.map((p) => (
             <ProjectRow
-              key={p.id}
+              key={p.encodedDir}
               project={p}
-              agents={agentsByProject.get(p.id) ?? []}
-              launchError={launchErrorProjectId === p.id ? launchError : undefined}
+              agents={agentsByDir.get(p.encodedDir) ?? []}
             />
           ))}
         </div>

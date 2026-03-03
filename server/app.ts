@@ -2,7 +2,6 @@ import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { createRequestHandler, type ServerBuild } from "react-router";
-import { getDb } from "../db/client.js";
 import { reconcileAgents, startPolling } from "./agents.js";
 import { createNodeWebSocket } from "@hono/node-ws";
 import { setupWs } from "./ws.js";
@@ -10,8 +9,7 @@ import { setupWs } from "./ws.js";
 const BUILD_PATH = "../build/server/index.js";
 const PORT = Number(process.env.PORT ?? 5173);
 
-// Initialize DB, reconcile existing tmux sessions, and start status polling
-getDb();
+// Reconcile existing tmux sessions and start status polling
 reconcileAgents();
 startPolling();
 
@@ -31,7 +29,7 @@ const handler = createRequestHandler(build);
 
 app.all("*", (c) => handler(c.req.raw));
 
-const server = serve({ fetch: app.fetch, port: PORT }, () => {
+const server = serve({ fetch: app.fetch.bind(app), port: PORT }, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
 

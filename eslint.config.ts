@@ -22,6 +22,8 @@ export default [
     rules: {
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
       "@typescript-eslint/restrict-template-expressions": ["error", { allowNumber: true }],
+      // React Router uses `throw new Response(...)` for 404s etc. — this is expected.
+      "@typescript-eslint/only-throw-error": ["error", { allow: [{ from: "lib", name: "Response" }] }],
     },
   },
   {
@@ -36,6 +38,8 @@ export default [
       "@typescript-eslint/no-unsafe-assignment": "off",
       "@typescript-eslint/no-unsafe-call": "off",
       "@typescript-eslint/no-unsafe-return": "off",
+      // createNodeWebSocket returns plain functions; destructuring is safe.
+      "@typescript-eslint/unbound-method": "off",
     },
   },
 ] as ReturnType<typeof tseslint.config>;

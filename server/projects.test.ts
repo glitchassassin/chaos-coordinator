@@ -1,180 +1,143 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdirSync, rmdirSync } from "fs";
-import { join } from "path";
-import { tmpdir } from "os";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
 
-// Hoist mock so it applies before module import
 vi.mock("child_process", () => ({
   execSync: vi.fn().mockReturnValue(""),
 }));
 
 import { execSync } from "child_process";
-import { createTestDb } from "../db/client.js";
-import { addProject, listProjects, removeProject } from "./projects.js";
+import { listProjects, getProject, clearProjectCache } from "./projects.js";
 
 const mockExecSync = vi.mocked(execSync);
 
-function makeTempDir(): string {
-  const dir = join(tmpdir(), `chaos-test-${crypto.randomUUID()}`);
-  mkdirSync(dir, { recursive: true });
-  return dir;
+// Create a temp .claude/projects directory structure for testing
+function createTempClaudeDir(): string {
+  const tmpDir = path.join(os.tmpdir(), `chaos-test-${crypto.randomUUID()}`);
+  const projectsDir = path.join(tmpDir, ".claude", "projects");
+  fs.mkdirSync(projectsDir, { recursive: true });
+  return tmpDir;
 }
 
-describe("addProject", () => {
-  let db: ReturnType<typeof createTestDb>;
-  let tempDir: string;
-
-  beforeEach(() => {
-    db = createTestDb();
-    tempDir = makeTempDir();
-    mockExecSync.mockReturnValue("");
+function addFakeProject(tmpDir: string, encodedDir: string, cwd: string): void {
+  const dir = path.join(tmpDir, ".claude", "projects", encodedDir);
+  fs.mkdirSync(dir, { recursive: true });
+  const logEntry = JSON.stringify({
+    cwd,
+    sessionId: crypto.randomUUID(),
+    type: "user",
+    message: { role: "user", content: "hello" },
   });
-
-  afterEach(() => {
-    rmdirSync(tempDir);
-  });
-
-  it("adds a project with basename as name when no git remote", () => {
-    mockExecSync.mockImplementation(() => {
-      throw new Error("not a git repo");
-    });
-    const project = addProject(tempDir, db);
-    expect(project.name).toBe(tempDir.split("/").at(-1));
-    expect(project.directory).toBe(tempDir);
-    expect(project.remoteUrl).toBeNull();
-    expect(project.providerType).toBeNull();
-    expect(project.owner).toBeNull();
-    expect(project.repo).toBeNull();
-  });
-
-  it("adds a project with owner/repo name for GitHub remote", () => {
-    mockExecSync.mockReturnValue("git@github.com:acme/widget.git\n");
-    const project = addProject(tempDir, db);
-    expect(project.name).toBe("acme/widget");
-    expect(project.remoteUrl).toBe("git@github.com:acme/widget.git");
-    expect(project.providerType).toBe("github");
-    expect(project.owner).toBe("acme");
-    expect(project.repo).toBe("widget");
-  });
-
-  it("adds a project with owner/repo name for Azure DevOps remote", () => {
-    mockExecSync.mockReturnValue(
-      "https://dev.azure.com/myorg/myproject/_git/myrepo\n",
-    );
-    const project = addProject(tempDir, db);
-    expect(project.name).toBe("myorg/myrepo");
-    expect(project.providerType).toBe("azure-devops");
-    expect(project.owner).toBe("myorg");
-    expect(project.repo).toBe("myrepo");
-  });
-
-  it("uses basename when remote URL is unrecognized", () => {
-    mockExecSync.mockReturnValue("https://gitlab.com/owner/repo.git\n");
-    const project = addProject(tempDir, db);
-    expect(project.name).toBe(tempDir.split("/").at(-1));
-    expect(project.remoteUrl).toBe("https://gitlab.com/owner/repo.git");
-    expect(project.providerType).toBeNull();
-  });
-
-  it("throws when directory does not exist", () => {
-    expect(() => addProject("/nonexistent/path/12345", db)).toThrow(
-      "Directory not found",
-    );
-  });
-
-  it("assigns a unique UUID id", () => {
-    const a = addProject(tempDir, db);
-    const otherDir = makeTempDir();
-    try {
-      const b = addProject(otherDir, db);
-      expect(a.id).not.toBe(b.id);
-    } finally {
-      rmdirSync(otherDir);
-    }
-  });
-
-  it("returns the existing project when the same directory is added twice", () => {
-    const a = addProject(tempDir, db);
-    const b = addProject(tempDir, db);
-    expect(b.id).toBe(a.id);
-  });
-
-  it("restores a removed project when its directory is re-added", () => {
-    const original = addProject(tempDir, db);
-    removeProject(original.id, db);
-    expect(listProjects(db)).toHaveLength(0);
-    const restored = addProject(tempDir, db);
-    expect(restored.id).toBe(original.id);
-    expect(restored.removedAt).toBeNull();
-    expect(listProjects(db)).toHaveLength(1);
-  });
-});
+  fs.writeFileSync(path.join(dir, `${crypto.randomUUID()}.jsonl`), logEntry);
+}
 
 describe("listProjects", () => {
-  let db: ReturnType<typeof createTestDb>;
-  let dirs: string[];
+  let tmpDir: string;
+  let origHome: string;
 
   beforeEach(() => {
-    db = createTestDb();
-    dirs = [];
+    tmpDir = createTempClaudeDir();
+    origHome = process.env.HOME ?? os.homedir();
+    // Override HOME so os.homedir() returns our temp dir
+    process.env.HOME = tmpDir;
+    clearProjectCache();
     mockExecSync.mockImplementation(() => {
       throw new Error("no git");
     });
   });
 
   afterEach(() => {
-    dirs.forEach((d) => rmdirSync(d));
+    process.env.HOME = origHome;
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  function addDir(): string {
-    const d = makeTempDir();
-    dirs.push(d);
-    return d;
-  }
-
-  it("returns empty array when no projects exist", () => {
-    expect(listProjects(db)).toEqual([]);
+  it("returns empty array when no project directories exist", () => {
+    expect(listProjects()).toEqual([]);
   });
 
-  it("returns all active projects", () => {
-    addProject(addDir(), db);
-    addProject(addDir(), db);
-    expect(listProjects(db)).toHaveLength(2);
+  it("discovers projects from JSONL cwd field", () => {
+    addFakeProject(tmpDir, "-Users-test-myproject", "/Users/test/myproject");
+    const projects = listProjects();
+    expect(projects).toHaveLength(1);
+    expect(projects[0].encodedDir).toBe("-Users-test-myproject");
+    expect(projects[0].directory).toBe("/Users/test/myproject");
+    expect(projects[0].name).toBe("myproject");
   });
 
-  it("excludes soft-deleted projects", () => {
-    const p = addProject(addDir(), db);
-    addProject(addDir(), db);
-    removeProject(p.id, db);
-    expect(listProjects(db)).toHaveLength(1);
+  it("detects GitHub remote for a project", () => {
+    addFakeProject(tmpDir, "-Users-test-repo", "/Users/test/repo");
+    mockExecSync.mockReturnValue("git@github.com:acme/widget.git\n");
+    const projects = listProjects();
+    expect(projects).toHaveLength(1);
+    expect(projects[0].name).toBe("acme/widget");
+    expect(projects[0].providerType).toBe("github");
+    expect(projects[0].owner).toBe("acme");
+    expect(projects[0].repo).toBe("widget");
+  });
+
+  it("skips directories without JSONL files", () => {
+    const dir = path.join(tmpDir, ".claude", "projects", "-Users-empty");
+    fs.mkdirSync(dir, { recursive: true });
+    expect(listProjects()).toEqual([]);
+  });
+
+  it("skips directories where no JSONL has a cwd field", () => {
+    const dir = path.join(tmpDir, ".claude", "projects", "-Users-nocwd");
+    fs.mkdirSync(dir, { recursive: true });
+    // Write a JSONL file without a cwd field
+    const entry = JSON.stringify({ type: "user", message: { role: "user", content: "hi" } });
+    fs.writeFileSync(path.join(dir, "test.jsonl"), entry);
+    expect(listProjects()).toEqual([]);
+  });
+
+  it("caches results on subsequent calls", () => {
+    addFakeProject(tmpDir, "-Users-test-cached", "/Users/test/cached");
+    const first = listProjects();
+    // Add another project — should not appear due to cache
+    addFakeProject(tmpDir, "-Users-test-new", "/Users/test/new");
+    const second = listProjects();
+    expect(first).toHaveLength(1);
+    expect(second).toHaveLength(1);
+  });
+
+  it("returns fresh data after cache cleared", () => {
+    addFakeProject(tmpDir, "-Users-test-cached2", "/Users/test/cached2");
+    listProjects();
+    clearProjectCache();
+    addFakeProject(tmpDir, "-Users-test-new2", "/Users/test/new2");
+    const result = listProjects();
+    expect(result).toHaveLength(2);
   });
 });
 
-describe("removeProject", () => {
-  let db: ReturnType<typeof createTestDb>;
-  let tempDir: string;
+describe("getProject", () => {
+  let tmpDir: string;
+  let origHome: string;
 
   beforeEach(() => {
-    db = createTestDb();
-    tempDir = makeTempDir();
+    tmpDir = createTempClaudeDir();
+    origHome = process.env.HOME ?? os.homedir();
+    process.env.HOME = tmpDir;
+    clearProjectCache();
     mockExecSync.mockImplementation(() => {
       throw new Error("no git");
     });
   });
 
   afterEach(() => {
-    rmdirSync(tempDir);
+    process.env.HOME = origHome;
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("soft-deletes by setting removed_at", () => {
-    const p = addProject(tempDir, db);
-    expect(p.removedAt).toBeNull();
-    removeProject(p.id, db);
-    const listed = listProjects(db);
-    expect(listed).toHaveLength(0);
+  it("returns project by encoded directory", () => {
+    addFakeProject(tmpDir, "-Users-test-proj", "/Users/test/proj");
+    const project = getProject("-Users-test-proj");
+    expect(project).toBeDefined();
+    expect(project?.directory).toBe("/Users/test/proj");
   });
 
-  it("is a no-op for an unknown id (does not throw)", () => {
-    expect(() => removeProject("nonexistent-id", db)).not.toThrow();
+  it("returns undefined for unknown encoded directory", () => {
+    expect(getProject("-nonexistent")).toBeUndefined();
   });
 });

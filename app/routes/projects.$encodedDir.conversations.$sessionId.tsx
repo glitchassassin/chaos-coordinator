@@ -1,44 +1,46 @@
 import { Form, redirect } from "react-router";
-import type { Route } from "./+types/agents.$id";
-import {
-  getAgent,
-  sendInput,
-  terminateAgent,
-  updateLogPath,
-  readScreen,
-} from "../../server/agents.js";
+import type { Route } from "./+types/projects.$encodedDir.conversations.$sessionId";
+import { useDoubleCheck } from "~/utils/misc";
 import { getProject } from "../../server/projects.js";
-import { findAgentLog, readLog } from "../../server/logs.js";
+import { listAgents, sendInput, terminateAgent, readScreen } from "../../server/agents.js";
+import { readLog } from "../../server/logs.js";
 import { ConversationLog } from "~/components/ConversationLog";
+import path from "node:path";
+import os from "node:os";
 
-export function meta({ data }: Route.MetaArgs) {
-  if (!data) return [{ title: "Agent" }];
-  return [{ title: `${data.project.name} — Agent` }];
+export function meta({ loaderData }: Route.MetaArgs) {
+  return [{ title: `Conversation — ${loaderData.project.name}` }];
 }
 
 export function loader({ params }: Route.LoaderArgs) {
-  const agent = getAgent(params.id!);
-  if (!agent) throw new Response("Agent not found", { status: 404 });
-
-  const project = getProject(agent.projectId);
+  const project = getProject(params.encodedDir);
   if (!project) throw new Response("Project not found", { status: 404 });
 
-  const logPath = agent.logPath ?? findAgentLog(project.directory, agent.createdAt);
-  const entries = logPath ? readLog(logPath) : [];
+  const sessionId = params.sessionId;
+  const logPath = path.join(
+    os.homedir(),
+    ".claude",
+    "projects",
+    params.encodedDir,
+    `${sessionId}.jsonl`,
+  );
 
-  // Persist the resolved path so future loads skip the scan
-  if (logPath && !agent.logPath) {
-    updateLogPath(agent.id, logPath);
-  }
+  const entries = readLog(logPath);
+
+  // Check if a running agent is associated with this session
+  const agents = listAgents(project.encodedDir);
+  const runningAgent = agents.find((a) => a.claudeSessionId === sessionId) ?? null;
 
   let screen = "";
-  try {
-    screen = readScreen(agent.id);
-  } catch {
-    /* agent may be terminated */
+  if (runningAgent) {
+    try {
+      screen = readScreen(runningAgent.id);
+    } catch {
+      /* agent may have just terminated */
+    }
   }
 
-  return { agent, project, entries, screen };
+  return { project, sessionId, entries, runningAgent, screen };
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
@@ -46,10 +48,11 @@ export async function action({ params, request }: Route.ActionArgs) {
   const intent = form.get("intent");
 
   if (intent === "send") {
+    const agentId = form.get("agentId") as string;
     const text = (form.get("text") as string | null)?.trim() ?? "";
     if (text) {
       try {
-        sendInput(params.id!, text);
+        sendInput(agentId, text);
       } catch (err) {
         return { intent: "send" as const, error: (err as Error).message };
       }
@@ -58,8 +61,9 @@ export async function action({ params, request }: Route.ActionArgs) {
   }
 
   if (intent === "terminate") {
-    terminateAgent(params.id!);
-    return redirect("/");
+    const agentId = form.get("agentId") as string;
+    terminateAgent(agentId);
+    return redirect(`/projects/${params.encodedDir}`);
   }
 
   return null;
@@ -72,7 +76,6 @@ const STATUS_COLOR: Record<string, string> = {
   idle: "#555555",
   waiting: "#f57f17",
   starting: "#555555",
-  terminated: "#c62828",
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -97,19 +100,25 @@ function StatusBadge({ status }: { status: string }) {
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function AgentDetail({ loaderData, actionData }: Route.ComponentProps) {
-  const { agent, project, entries, screen } = loaderData;
+export default function ConversationView({ loaderData, actionData }: Route.ComponentProps) {
+  const { project, sessionId, entries, runningAgent, screen } = loaderData;
   const sendError =
     actionData && "error" in actionData ? (actionData as { error: string }).error : undefined;
-  const alive = agent.status !== "terminated";
+  const dc = useDoubleCheck();
 
   return (
     <main style={{ maxWidth: 900, margin: "0 auto", padding: "2rem 1rem" }}>
       {/* Breadcrumb */}
-      <div style={{ marginBottom: "1.5rem" }}>
-        <a href="/" style={{ color: "#1565c0", fontSize: "0.875rem" }}>
-          ← Projects
+      <div style={{ marginBottom: "1.5rem", fontSize: "0.875rem" }}>
+        <a href="/" style={{ color: "#1565c0" }}>Projects</a>
+        {" / "}
+        <a href={`/projects/${project.encodedDir}`} style={{ color: "#1565c0" }}>
+          {project.name}
         </a>
+        {" / "}
+        <span style={{ color: "#555555" }}>
+          {sessionId.slice(0, 8)}
+        </span>
       </div>
 
       {/* Header */}
@@ -124,42 +133,40 @@ export default function AgentDetail({ loaderData, actionData }: Route.ComponentP
       >
         <div style={{ flex: 1, minWidth: 0 }}>
           <h1 style={{ fontSize: "1.25rem", marginBottom: "0.25rem" }}>{project.name}</h1>
-          <div
-            className="font-mono"
-            style={{ color: "#555555", fontSize: "0.875rem", wordBreak: "break-all" }}
-          >
-            {project.directory}
-          </div>
-          <div
-            style={{
-              marginTop: "0.5rem",
-              display: "flex",
-              gap: "0.75rem",
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}
-          >
-            <StatusBadge status={agent.status} />
-            <span style={{ color: "#555555", fontSize: "0.875rem" }}>
-              Started {new Date(agent.createdAt).toLocaleString()}
-            </span>
-          </div>
+          {runningAgent && (
+            <div
+              style={{
+                marginTop: "0.5rem",
+                display: "flex",
+                gap: "0.75rem",
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              <StatusBadge status={runningAgent.status} />
+              <span style={{ color: "#555555", fontSize: "0.875rem" }}>
+                Started {new Date(runningAgent.createdAt).toLocaleString()}
+              </span>
+            </div>
+          )}
         </div>
 
-        {alive && (
+        {runningAgent && (
           <Form method="post" style={{ flexShrink: 0 }}>
             <input type="hidden" name="intent" value="terminate" />
+            <input type="hidden" name="agentId" value={runningAgent.id} />
             <button
               type="submit"
+              {...dc.getButtonProps()}
               style={{
                 padding: "0.5rem 1rem",
                 border: "3px solid #c62828",
-                background: "#c62828",
-                color: "#fff",
+                background: dc.doubleCheck ? "#c62828" : "none",
+                color: dc.doubleCheck ? "#fff" : "#c62828",
                 cursor: "pointer",
               }}
             >
-              Terminate
+              {dc.doubleCheck ? "Confirm?" : "Terminate"}
             </button>
           </Form>
         )}
@@ -177,35 +184,42 @@ export default function AgentDetail({ loaderData, actionData }: Route.ComponentP
         >
           Conversation
         </h2>
-        <ConversationLog initialEntries={entries} agentId={agent.id} />
+        <ConversationLog
+          initialEntries={entries}
+          sessionId={sessionId}
+          encodedDir={project.encodedDir}
+          agentId={runningAgent?.id}
+        />
       </section>
 
       {/* Terminal capture */}
-      <section style={{ marginBottom: "2rem" }}>
-        <details>
-          <summary style={{ cursor: "pointer", fontWeight: 600, padding: "0.25rem 0" }}>
-            Terminal
-          </summary>
-          <pre
-            style={{
-              border: "1px solid #cccccc",
-              padding: "0.75rem",
-              fontSize: "0.8125rem",
-              fontFamily: "monospace",
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-              overflowY: "auto",
-              maxHeight: 400,
-              marginTop: "0.5rem",
-            }}
-          >
-            {screen || "(no output)"}
-          </pre>
-        </details>
-      </section>
+      {runningAgent && (
+        <section style={{ marginBottom: "2rem" }}>
+          <details>
+            <summary style={{ cursor: "pointer", fontWeight: 600, padding: "0.25rem 0" }}>
+              Terminal
+            </summary>
+            <pre
+              style={{
+                border: "1px solid #cccccc",
+                padding: "0.75rem",
+                fontSize: "0.8125rem",
+                fontFamily: "monospace",
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                overflowY: "auto",
+                maxHeight: 400,
+                marginTop: "0.5rem",
+              }}
+            >
+              {screen || "(no output)"}
+            </pre>
+          </details>
+        </section>
+      )}
 
       {/* Send input */}
-      {alive && (
+      {runningAgent && (
         <section>
           <h2
             style={{
@@ -219,6 +233,7 @@ export default function AgentDetail({ loaderData, actionData }: Route.ComponentP
           </h2>
           <Form method="post">
             <input type="hidden" name="intent" value="send" />
+            <input type="hidden" name="agentId" value={runningAgent.id} />
             <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end" }}>
               <textarea
                 name="text"

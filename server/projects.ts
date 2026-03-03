@@ -1,12 +1,19 @@
 import { execSync } from "child_process";
-import { existsSync, accessSync, constants } from "fs";
-import { basename } from "path";
-import { eq, isNull } from "drizzle-orm";
-import { type Db, getDb } from "../db/client.js";
-import { projects } from "../db/schema.js";
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
 import { parseRemoteUrl } from "./git.js";
+import { readCwd, listLogFiles } from "./logs.js";
 
-export type Project = typeof projects.$inferSelect;
+export interface Project {
+  encodedDir: string;
+  directory: string;
+  name: string;
+  remoteUrl: string | null;
+  providerType: "github" | "azure-devops" | null;
+  owner: string | null;
+  repo: string | null;
+}
 
 function getRemoteUrl(directory: string): string | null {
   try {
@@ -21,51 +28,81 @@ function getRemoteUrl(directory: string): string | null {
   }
 }
 
-export function addProject(directory: string, db: Db = getDb()): Project {
-  if (!existsSync(directory)) {
-    throw new Error(`Directory not found: ${directory}`);
+/**
+ * Resolve the real directory path for a Claude projects subdirectory.
+ * Reads the `cwd` field from the first JSONL file that has one.
+ */
+function resolveDirectory(encodedDir: string): string | null {
+  const logDir = path.join(os.homedir(), ".claude", "projects", encodedDir);
+  const files = listLogFiles(logDir);
+  for (const file of files) {
+    const cwd = readCwd(file);
+    if (cwd) return cwd;
   }
+  return null;
+}
+
+// ── Cache ───────────────────────────────────────────────────────────────────
+
+interface CacheEntry {
+  projects: Project[];
+  expiresAt: number;
+}
+
+const CACHE_TTL_MS = 10_000;
+let cache: CacheEntry | null = null;
+
+export function clearProjectCache(): void {
+  cache = null;
+}
+
+// ── Public API ──────────────────────────────────────────────────────────────
+
+/**
+ * Scan ~/.claude/projects/ for subdirectories and build Project list.
+ * Caches results with a short TTL.
+ */
+export function listProjects(): Project[] {
+  if (cache && Date.now() < cache.expiresAt) return cache.projects;
+
+  const projectsDir = path.join(os.homedir(), ".claude", "projects");
+  let entries: fs.Dirent[];
   try {
-    accessSync(directory, constants.R_OK);
+    entries = fs.readdirSync(projectsDir, { withFileTypes: true });
   } catch {
-    throw new Error(`Directory not accessible: ${directory}`);
+    return [];
   }
 
-  const remoteUrl = getRemoteUrl(directory);
-  const remoteInfo = remoteUrl ? parseRemoteUrl(remoteUrl) : null;
-  const name = remoteInfo ? `${remoteInfo.owner}/${remoteInfo.repo}` : basename(directory);
-  const fields = {
-    name,
-    remoteUrl,
-    providerType: remoteInfo?.providerType ?? null,
-    owner: remoteInfo?.owner ?? null,
-    repo: remoteInfo?.repo ?? null,
-  };
+  const results: Project[] = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const encodedDir = entry.name;
 
-  // Restore a previously removed project rather than hitting the unique constraint.
-  const existing = db.select().from(projects).where(eq(projects.directory, directory)).get();
-  if (existing) {
-    db.update(projects)
-      .set({ ...fields, removedAt: null })
-      .where(eq(projects.id, existing.id))
-      .run();
-    return db.select().from(projects).where(eq(projects.id, existing.id)).get()!;
+    const directory = resolveDirectory(encodedDir);
+    if (!directory) continue;
+
+    const remoteUrl = getRemoteUrl(directory);
+    const remoteInfo = remoteUrl ? parseRemoteUrl(remoteUrl) : null;
+    const name = remoteInfo
+      ? `${remoteInfo.owner}/${remoteInfo.repo}`
+      : path.basename(directory);
+
+    results.push({
+      encodedDir,
+      directory,
+      name,
+      remoteUrl,
+      providerType: remoteInfo?.providerType ?? null,
+      owner: remoteInfo?.owner ?? null,
+      repo: remoteInfo?.repo ?? null,
+    });
   }
 
-  const id = crypto.randomUUID();
-  db.insert(projects).values({ id, directory, ...fields }).run();
-  return db.select().from(projects).where(eq(projects.id, id)).get()!;
+  cache = { projects: results, expiresAt: Date.now() + CACHE_TTL_MS };
+  return results;
 }
 
-export function listProjects(db: Db = getDb()): Project[] {
-  return db.select().from(projects).where(isNull(projects.removedAt)).all();
-}
-
-export function getProject(id: string, db: Db = getDb()): Project | undefined {
-  return db.select().from(projects).where(eq(projects.id, id)).get();
-}
-
-export function removeProject(id: string, db: Db = getDb()): void {
-  const removedAt = new Date().toISOString();
-  db.update(projects).set({ removedAt }).where(eq(projects.id, id)).run();
+/** Get a single project by its encoded directory name. */
+export function getProject(encodedDir: string): Project | undefined {
+  return listProjects().find((p) => p.encodedDir === encodedDir);
 }

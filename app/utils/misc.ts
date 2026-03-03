@@ -1,9 +1,13 @@
 import { useState, useEffect } from "react";
 
-function callAll<Args extends Array<unknown>>(
-  ...fns: Array<((...args: Args) => unknown) | undefined>
+function callAll<Args extends unknown[]>(
+  ...fns: ((...args: Args) => unknown)[]
 ) {
-  return (...args: Args) => fns.forEach((fn) => fn?.(...args));
+  return (...args: Args) => {
+    fns.forEach((fn) => {
+      fn(...args);
+    });
+  };
 }
 
 /**
@@ -18,13 +22,18 @@ export function useDoubleCheck(timeoutMs = 5000) {
 
   useEffect(() => {
     if (!doubleCheck) return;
-    const id = setTimeout(() => setDoubleCheck(false), timeoutMs);
-    return () => clearTimeout(id);
+    const id = setTimeout(() => {
+      setDoubleCheck(false);
+    }, timeoutMs);
+    return () => {
+      clearTimeout(id);
+    };
   }, [doubleCheck, timeoutMs]);
 
   function getButtonProps(props?: React.ButtonHTMLAttributes<HTMLButtonElement>) {
-    const onBlur: React.ButtonHTMLAttributes<HTMLButtonElement>["onBlur"] = () =>
+    const onBlur: React.ButtonHTMLAttributes<HTMLButtonElement>["onBlur"] = () => {
       setDoubleCheck(false);
+    };
 
     const onClick: React.ButtonHTMLAttributes<HTMLButtonElement>["onClick"] = doubleCheck
       ? undefined
@@ -34,7 +43,9 @@ export function useDoubleCheck(timeoutMs = 5000) {
         };
 
     const onKeyUp: React.ButtonHTMLAttributes<HTMLButtonElement>["onKeyUp"] = (e) => {
-      if (e.key === "Escape") setDoubleCheck(false);
+      if (e.key === "Escape") {
+        setDoubleCheck(false);
+      }
     };
 
     return {

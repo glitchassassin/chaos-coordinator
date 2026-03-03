@@ -1,81 +1,42 @@
 import { test, expect } from "@playwright/test";
-import { mkdirSync, rmdirSync } from "fs";
-import { join } from "path";
-import { tmpdir } from "os";
 
-function makeTempDir(): string {
-  const dir = join(tmpdir(), `chaos-e2e-${crypto.randomUUID()}`);
-  mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
-/** Locates the project row for a given directory path. */
-function projectRow(page: Parameters<typeof test>[1] extends (args: { page: infer P }) => unknown ? P : never, dir: string) {
-  return page.locator(`[data-testid="project-row"][data-dir="${dir}"]`);
-}
-
-test.describe("project management", () => {
-  let tempDir: string;
-
-  test.beforeEach(() => {
-    tempDir = makeTempDir();
-  });
-
-  test.afterEach(() => {
-    try { rmdirSync(tempDir); } catch { /* best effort */ }
-  });
-
-  test("adds a project by directory path and shows it in the list", async ({ page }) => {
+test.describe("project discovery", () => {
+  test("home page shows auto-discovered projects", async ({ page }) => {
     await page.goto("/");
 
-    await page.getByLabel("Project directory path").fill(tempDir);
-    await page.getByRole("button", { name: "Add Project" }).click();
+    // The page should load and show the Projects heading
+    await expect(page.getByRole("heading", { name: "Projects" })).toBeVisible();
 
-    const row = projectRow(page, tempDir);
-    await expect(row).toBeVisible();
-    await expect(row.getByText(tempDir)).toBeVisible();
+    // Projects from ~/.claude/projects/ should appear (or empty state)
+    const rows = page.locator("[data-testid='project-row']");
+    const emptyState = page.getByText("No projects found");
+
+    // One or the other should be present
+    const hasRows = await rows.count().then((c) => c > 0);
+    if (!hasRows) {
+      await expect(emptyState).toBeVisible();
+    }
   });
 
-  test("shows an error for a non-existent directory", async ({ page }) => {
-    await page.goto("/");
-    await page.getByLabel("Project directory path").fill("/nonexistent/path/abc123");
-    await page.getByRole("button", { name: "Add Project" }).click();
-    await expect(page.getByRole("alert")).toBeVisible();
-  });
-
-  test("removes a project after double-check confirm", async ({ page }) => {
+  test("project rows link to project detail pages", async ({ page }) => {
     await page.goto("/");
 
-    // Add
-    await page.getByLabel("Project directory path").fill(tempDir);
-    await page.getByRole("button", { name: "Add Project" }).click();
-    const row = projectRow(page, tempDir);
-    await expect(row).toBeVisible();
+    const rows = page.locator("[data-testid='project-row']");
+    const count = await rows.count();
+    if (count === 0) {
+      test.skip();
+      return;
+    }
 
-    // First click: label changes to "Confirm?"
-    await row.getByRole("button", { name: "Remove" }).click();
-    await expect(row.getByRole("button", { name: "Confirm?" })).toBeVisible();
+    // First project row should be a link to its detail page
+    const firstRow = rows.first();
+    const href = await firstRow.getAttribute("href");
+    expect(href).toMatch(/^\/projects\//);
 
-    // Second click: submits, row disappears
-    await row.getByRole("button", { name: "Confirm?" }).click();
-    await expect(row).not.toBeVisible();
-  });
-
-  test("auto-resets after 5 seconds without confirmation", async ({ page }) => {
-    await page.goto("/");
-
-    await page.getByLabel("Project directory path").fill(tempDir);
-    await page.getByRole("button", { name: "Add Project" }).click();
-    const row = projectRow(page, tempDir);
-    await expect(row).toBeVisible();
-
-    // First click
-    await row.getByRole("button", { name: "Remove" }).click();
-    await expect(row.getByRole("button", { name: "Confirm?" })).toBeVisible();
-
-    // Wait 5 s — label reverts
-    await page.waitForTimeout(5100);
-    await expect(row.getByRole("button", { name: "Remove" })).toBeVisible();
-    await expect(row).toBeVisible();
+    // Click and verify we land on the project detail page
+    await firstRow.click();
+    await expect(page.getByText("← Projects")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Running Agents" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Conversations" })).toBeVisible();
   });
 });

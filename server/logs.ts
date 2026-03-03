@@ -114,6 +114,67 @@ export function findAgentLog(
   return candidates[0] ?? files[0]; // fallback to newest
 }
 
+// ── Conversation discovery ────────────────────────────────────────────────────
+
+export interface ConversationMeta {
+  sessionId: string;
+  path: string;
+  mtime: number;
+}
+
+/**
+ * Read the `cwd` field from the first entry in a JSONL file that has one.
+ * Fast — reads line-by-line and stops at the first match.
+ */
+export function readCwd(logPath: string): string | null {
+  try {
+    const content = fs.readFileSync(logPath, "utf-8");
+    for (const line of content.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        const raw = JSON.parse(trimmed) as Record<string, unknown>;
+        if (typeof raw.cwd === "string" && raw.cwd) return raw.cwd;
+      } catch {
+        // skip malformed lines
+      }
+    }
+  } catch {
+    // file not found or unreadable
+  }
+  return null;
+}
+
+/**
+ * List all conversations (JSONL files) for a project's encoded directory.
+ * Returns structured metadata sorted newest-first by mtime.
+ * Skips subagents/ subdirectories.
+ */
+export function listConversations(encodedDir: string): ConversationMeta[] {
+  const logDir = path.join(os.homedir(), ".claude", "projects", encodedDir);
+  try {
+    const entries = fs.readdirSync(logDir, { withFileTypes: true });
+    const results: ConversationMeta[] = [];
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue;
+      const filePath = path.join(logDir, entry.name);
+      try {
+        const stat = fs.statSync(filePath);
+        results.push({
+          sessionId: entry.name.replace(/\.jsonl$/, ""),
+          path: filePath,
+          mtime: stat.mtimeMs,
+        });
+      } catch {
+        // skip unreadable files
+      }
+    }
+    return results.sort((a, b) => b.mtime - a.mtime);
+  } catch {
+    return [];
+  }
+}
+
 // ── JSONL parsing ──────────────────────────────────────────────────────────────
 
 function normalizeContent(raw: unknown): ContentBlock[] {
@@ -146,7 +207,7 @@ export function readLog(logPath: string): LogEntry[] {
         if (!msg?.role) continue;
 
         entries.push({
-          type: raw.type as "user" | "assistant",
+          type: raw.type,
           uuid: raw.uuid as string | undefined,
           timestamp: raw.timestamp as string | undefined,
           message: {
@@ -186,6 +247,7 @@ export function watchLog(
       }, 1000);
     });
   } catch {
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
     return () => {};
   }
 

@@ -16,29 +16,27 @@ export interface RemoteInfo {
  */
 export function parseRemoteUrl(url: string): RemoteInfo | null {
   // GitHub SSH
-  const githubSsh = url.match(/^git@github\.com:([^/]+)\/(.+?)(?:\.git)?$/);
+  const githubSsh = /^git@github\.com:([^/]+)\/(.+?)(?:\.git)?$/.exec(url);
   if (githubSsh) {
     return { providerType: "github", owner: githubSsh[1], repo: githubSsh[2] };
   }
 
   // GitHub HTTPS
-  const githubHttps = url.match(/^https?:\/\/github\.com\/([^/]+)\/(.+?)(?:\.git)?\/?$/);
+  const githubHttps = /^https?:\/\/github\.com\/([^/]+)\/(.+?)(?:\.git)?\/?$/.exec(url);
   if (githubHttps) {
     return { providerType: "github", owner: githubHttps[1], repo: githubHttps[2] };
   }
 
   // Azure DevOps HTTPS: https://dev.azure.com/org/project/_git/repo
-  const azureNew = url.match(
-    /^https?:\/\/dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/(.+?)(?:\.git)?\/?$/,
-  );
+  const azureNew =
+    /^https?:\/\/dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/(.+?)(?:\.git)?\/?$/.exec(url);
   if (azureNew) {
     return { providerType: "azure-devops", owner: azureNew[1], repo: azureNew[3] };
   }
 
   // Azure DevOps legacy: https://org.visualstudio.com/[DefaultCollection/]project/_git/repo
-  const azureLegacy = url.match(
-    /^https?:\/\/([^.]+)\.visualstudio\.com\/(?:DefaultCollection\/)?([^/]+)\/_git\/(.+?)(?:\.git)?\/?$/,
-  );
+  const azureLegacy =
+    /^https?:\/\/([^.]+)\.visualstudio\.com\/(?:DefaultCollection\/)?([^/]+)\/_git\/(.+?)(?:\.git)?\/?$/.exec(url);
   if (azureLegacy) {
     return { providerType: "azure-devops", owner: azureLegacy[1], repo: azureLegacy[3] };
   }

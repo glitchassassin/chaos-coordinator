@@ -183,17 +183,23 @@ function AssistantEntry({
 
 interface ConversationLogProps {
   initialEntries: LogEntry[];
-  agentId: string;
+  sessionId: string;
+  encodedDir: string;
+  agentId?: string;
 }
 
-export function ConversationLog({ initialEntries, agentId }: ConversationLogProps) {
+export function ConversationLog({ initialEntries, sessionId, encodedDir, agentId }: ConversationLogProps) {
   const [entries, setEntries] = useState<LogEntry[]>(initialEntries);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // WebSocket live updates
+  // WebSocket live updates — only connect if we have an agentId (running agent)
   useEffect(() => {
+    if (!agentId) return;
+
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(`${proto}//${window.location.host}/ws?agentId=${agentId}`);
+    const ws = new WebSocket(
+      `${proto}//${window.location.host}/ws?sessionId=${sessionId}&dir=${encodedDir}`,
+    );
 
     ws.onmessage = (event: MessageEvent) => {
       try {
@@ -209,8 +215,10 @@ export function ConversationLog({ initialEntries, agentId }: ConversationLogProp
       }
     };
 
-    return () => ws.close();
-  }, [agentId]);
+    return () => {
+      ws.close();
+    };
+  }, [agentId, sessionId, encodedDir]);
 
   // Auto-scroll to bottom when new entries arrive
   useEffect(() => {

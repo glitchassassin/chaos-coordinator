@@ -1,19 +1,27 @@
-import { eq, isNull } from "drizzle-orm";
-import { type Db, getDb } from "../db/client.js";
-import { agents, projects } from "../db/schema.js";
 import * as tmux from "./tmux.js";
 
-export type Agent = typeof agents.$inferSelect;
-export type AgentStatus =
-  | "starting"
-  | "active"
-  | "idle"
-  | "waiting"
-  | "terminated";
+export interface RunningAgent {
+  id: string;
+  encodedDir: string;
+  directory: string;
+  tmuxSession: string;
+  status: "starting" | "active" | "idle" | "waiting";
+  initialPrompt: string | null;
+  claudeSessionId: string | null;
+  logPath: string | null;
+  createdAt: string;
+}
+
+export type AgentStatus = RunningAgent["status"] | "terminated";
 
 const SESSION_PREFIX = "orch-";
 
-// In-memory poll state — tracks last capture per agent to detect changes.
+// ── In-memory stores ────────────────────────────────────────────────────────
+
+/** All running agents, keyed by agent ID. */
+const agents = new Map<string, RunningAgent>();
+
+/** Per-agent poll state for idle detection. */
 interface PollState {
   lastCapture: string;
   lastChangeAt: number;
@@ -24,131 +32,120 @@ function sessionName(agentId: string): string {
   return `${SESSION_PREFIX}${agentId}`;
 }
 
+// ── Public API ──────────────────────────────────────────────────────────────
+
 /**
- * Launch a new Claude Code agent for the given project.
- * Creates a tmux session named `orch-{id}` running `claude` in the project directory.
- * Sends the optional initial prompt after launch.
+ * Launch a new Claude Code agent for a project directory.
+ * Creates a tmux session named `orch-{id}` running `claude`.
  */
 export function launchAgent(
-  projectId: string,
+  encodedDir: string,
+  directory: string,
   initialPrompt?: string,
-  db: Db = getDb(),
-): Agent {
-  const project = db
-    .select()
-    .from(projects)
-    .where(eq(projects.id, projectId))
-    .get();
-  if (!project) throw new Error(`Project not found: ${projectId}`);
-  if (project.removedAt) throw new Error(`Project has been removed: ${projectId}`);
-
+): RunningAgent {
   const id = crypto.randomUUID();
   const session = sessionName(id);
 
-  tmux.createSession(session, project.directory, "claude");
+  tmux.createSession(session, directory, "claude");
   if (initialPrompt?.trim()) {
     tmux.sendInput(session, initialPrompt);
   }
 
-  db.insert(agents)
-    .values({
-      id,
-      projectId,
-      tmuxSession: session,
-      status: "starting",
-      initialPrompt: initialPrompt ?? null,
-    })
-    .run();
+  const agent: RunningAgent = {
+    id,
+    encodedDir,
+    directory,
+    tmuxSession: session,
+    status: "starting",
+    initialPrompt: initialPrompt ?? null,
+    claudeSessionId: null,
+    logPath: null,
+    createdAt: new Date().toISOString(),
+  };
 
-  const inserted = db.select().from(agents).where(eq(agents.id, id)).get();
-  if (!inserted) throw new Error("Failed to create agent record");
-  return inserted;
+  agents.set(id, agent);
+  return agent;
 }
 
 /**
  * Send text input to a running agent.
- * Multi-line text uses Alt+Enter between lines (Claude Code convention).
  */
-export function sendInput(agentId: string, text: string, db: Db = getDb()): void {
-  const agent = db.select().from(agents).where(eq(agents.id, agentId)).get();
+export function sendInput(agentId: string, text: string): void {
+  const agent = agents.get(agentId);
   if (!agent) throw new Error(`Agent not found: ${agentId}`);
-  if (agent.status === "terminated") throw new Error(`Agent is terminated: ${agentId}`);
   tmux.sendInput(agent.tmuxSession, text);
 }
 
 /** Capture the current terminal screen for an agent. */
-export function readScreen(agentId: string, db: Db = getDb()): string {
-  const agent = db.select().from(agents).where(eq(agents.id, agentId)).get();
+export function readScreen(agentId: string): string {
+  const agent = agents.get(agentId);
   if (!agent) throw new Error(`Agent not found: ${agentId}`);
   return tmux.capturePane(agent.tmuxSession);
 }
 
 /**
  * Terminate an agent: send `/exit` then force-kill the tmux session.
- * Marks the agent as terminated in the database.
+ * Removes the agent from the in-memory store.
  */
-export function terminateAgent(agentId: string, db: Db = getDb()): void {
-  const agent = db.select().from(agents).where(eq(agents.id, agentId)).get();
+export function terminateAgent(agentId: string): void {
+  const agent = agents.get(agentId);
   if (!agent) return;
 
-  if (agent.status !== "terminated") {
-    try {
-      tmux.sendInput(agent.tmuxSession, "/exit");
-    } catch {
-      // best-effort graceful exit
-    }
-    tmux.killSession(agent.tmuxSession);
+  try {
+    tmux.sendInput(agent.tmuxSession, "/exit");
+  } catch {
+    // best-effort graceful exit
   }
+  tmux.killSession(agent.tmuxSession);
 
-  db.update(agents)
-    .set({ status: "terminated", endedAt: new Date().toISOString() })
-    .where(eq(agents.id, agentId))
-    .run();
+  agents.delete(agentId);
   pollState.delete(agentId);
 }
 
-/** List agents, optionally filtered by project. */
-export function listAgents(projectId?: string, db: Db = getDb()): Agent[] {
-  if (projectId) {
-    return db
-      .select()
-      .from(agents)
-      .where(eq(agents.projectId, projectId))
-      .all();
-  }
-  return db.select().from(agents).all();
+/** List running agents, optionally filtered by encoded directory. */
+export function listAgents(encodedDir?: string): RunningAgent[] {
+  const all = Array.from(agents.values());
+  if (encodedDir) return all.filter((a) => a.encodedDir === encodedDir);
+  return all;
 }
 
-/** Get a single agent by ID. Returns undefined if not found. */
-export function getAgent(id: string, db: Db = getDb()): Agent | undefined {
-  return db.select().from(agents).where(eq(agents.id, id)).get();
-}
-
-/** Persist a resolved log file path for an agent. */
-export function updateLogPath(agentId: string, logPath: string, db: Db = getDb()): void {
-  db.update(agents).set({ logPath }).where(eq(agents.id, agentId)).run();
+/** Get a single running agent by ID. */
+export function getAgent(id: string): RunningAgent | undefined {
+  return agents.get(id);
 }
 
 /**
- * Reconcile agent records against live tmux sessions.
- * Called on server startup to re-adopt running sessions and mark
- * orphaned agents as terminated.
+ * Reconcile running agents against live tmux sessions.
+ * Called on server startup to re-adopt running `orch-*` sessions.
  */
-export function reconcileAgents(db: Db = getDb()): void {
-  const sessions = new Set(tmux.listSessions());
-  const liveAgents = db
-    .select()
-    .from(agents)
-    .where(isNull(agents.endedAt))
-    .all();
+export function reconcileAgents(): void {
+  const sessions = tmux.listSessions();
+  const orchSessions = sessions.filter((s) => s.startsWith(SESSION_PREFIX));
 
-  for (const agent of liveAgents) {
-    if (!sessions.has(agent.tmuxSession)) {
-      db.update(agents)
-        .set({ status: "terminated", endedAt: new Date().toISOString() })
-        .where(eq(agents.id, agent.id))
-        .run();
+  // Remove agents whose sessions no longer exist
+  for (const [id, agent] of agents) {
+    if (!sessions.includes(agent.tmuxSession)) {
+      agents.delete(id);
+      pollState.delete(id);
     }
+  }
+
+  // Adopt orphan orch-* sessions not already tracked
+  const tracked = new Set(Array.from(agents.values()).map((a) => a.tmuxSession));
+  for (const session of orchSessions) {
+    if (tracked.has(session)) continue;
+    const id = session.slice(SESSION_PREFIX.length);
+    agents.set(id, {
+      id,
+      encodedDir: "",
+      directory: "",
+      tmuxSession: session,
+      status: "active",
+      initialPrompt: null,
+      claudeSessionId: null,
+      logPath: null,
+      createdAt: new Date().toISOString(),
+    });
   }
 }
 
@@ -171,17 +168,13 @@ const IDLE_THRESHOLD_MS = 30_000;
 
 /**
  * Poll a single agent: update its status based on tmux capture-pane output.
- * Exported for testing; normally called by startPolling.
  */
-export function pollAgent(agentId: string, db: Db = getDb()): void {
-  const agent = db.select().from(agents).where(eq(agents.id, agentId)).get();
-  if (!agent || agent.status === "terminated") return;
+export function pollAgent(agentId: string): void {
+  const agent = agents.get(agentId);
+  if (!agent) return;
 
   if (!tmux.sessionExists(agent.tmuxSession)) {
-    db.update(agents)
-      .set({ status: "terminated", endedAt: new Date().toISOString() })
-      .where(eq(agents.id, agentId))
-      .run();
+    agents.delete(agentId);
     pollState.delete(agentId);
     return;
   }
@@ -192,42 +185,36 @@ export function pollAgent(agentId: string, db: Db = getDb()): void {
 
   if (!state) {
     pollState.set(agentId, { lastCapture: capture, lastChangeAt: now });
-    db.update(agents)
-      .set({ status: inferStatus(capture) })
-      .where(eq(agents.id, agentId))
-      .run();
+    agent.status = inferStatus(capture);
     return;
   }
 
   if (capture !== state.lastCapture) {
     state.lastCapture = capture;
     state.lastChangeAt = now;
-    db.update(agents)
-      .set({ status: inferStatus(capture) })
-      .where(eq(agents.id, agentId))
-      .run();
+    agent.status = inferStatus(capture);
   } else if (now - state.lastChangeAt > IDLE_THRESHOLD_MS) {
-    db.update(agents)
-      .set({ status: "idle" })
-      .where(eq(agents.id, agentId))
-      .run();
+    agent.status = "idle";
   }
 }
 
 /**
- * Start polling all live agents every 2 seconds.
- * Returns a stop function. Call on server startup.
+ * Start polling all running agents every 2 seconds.
+ * Returns a stop function.
  */
-export function startPolling(db: Db = getDb()): () => void {
+export function startPolling(): () => void {
   const timer = setInterval(() => {
-    const liveAgents = db
-      .select()
-      .from(agents)
-      .where(isNull(agents.endedAt))
-      .all();
-    for (const agent of liveAgents) {
-      pollAgent(agent.id, db);
+    for (const id of agents.keys()) {
+      pollAgent(id);
     }
   }, 2_000);
-  return () => { clearInterval(timer); };
+  return () => {
+    clearInterval(timer);
+  };
+}
+
+/** Clear all agents from in-memory store (for testing). */
+export function _clearAgents(): void {
+  agents.clear();
+  pollState.clear();
 }

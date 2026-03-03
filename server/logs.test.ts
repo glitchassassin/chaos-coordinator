@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { encodeDirectory, readLog, findLogDir, watchLog } from "./logs.js";
+import { encodeDirectory, readLog, findLogDir, watchLog, readCwd, listConversations } from "./logs.js";
 
 // ── encodeDirectory ────────────────────────────────────────────────────────────
 
@@ -175,14 +175,115 @@ describe("watchLog", () => {
   });
 
   test("returns an unwatch function without throwing", () => {
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
     const unwatch = watchLog(filePath, () => {});
     expect(typeof unwatch).toBe("function");
     unwatch();
   });
 
   test("returns no-op for nonexistent file", () => {
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
     const unwatch = watchLog("/no/such/file.jsonl", () => {});
     expect(typeof unwatch).toBe("function");
     unwatch(); // should not throw
+  });
+});
+
+// ── readCwd ────────────────────────────────────────────────────────────────────
+
+describe("readCwd", () => {
+  let filePath: string;
+
+  beforeEach(() => {
+    filePath = tmpFile();
+  });
+
+  afterEach(() => {
+    try {
+      fs.unlinkSync(filePath);
+    } catch {
+      /* ok */
+    }
+  });
+
+  test("reads cwd from first entry that has it", () => {
+    const lines = [
+      JSON.stringify({ type: "system", data: "no cwd here" }),
+      JSON.stringify({ cwd: "/Users/test/project", type: "user", message: { role: "user", content: "hi" } }),
+      JSON.stringify({ cwd: "/Users/test/other", type: "assistant", message: { role: "assistant", content: "world" } }),
+    ];
+    fs.writeFileSync(filePath, lines.join("\n"));
+    expect(readCwd(filePath)).toBe("/Users/test/project");
+  });
+
+  test("returns null when no entry has cwd", () => {
+    const line = JSON.stringify({ type: "user", message: { role: "user", content: "hi" } });
+    fs.writeFileSync(filePath, line);
+    expect(readCwd(filePath)).toBeNull();
+  });
+
+  test("returns null for nonexistent file", () => {
+    expect(readCwd("/no/such/file.jsonl")).toBeNull();
+  });
+
+  test("skips empty cwd strings", () => {
+    const lines = [
+      JSON.stringify({ cwd: "", type: "user", message: { role: "user", content: "hi" } }),
+      JSON.stringify({ cwd: "/real/path", type: "user", message: { role: "user", content: "hi" } }),
+    ];
+    fs.writeFileSync(filePath, lines.join("\n"));
+    expect(readCwd(filePath)).toBe("/real/path");
+  });
+});
+
+// ── listConversations ──────────────────────────────────────────────────────────
+
+describe("listConversations", () => {
+  let tmpDir: string;
+  let origHome: string;
+
+  beforeEach(() => {
+    tmpDir = path.join(os.tmpdir(), `chaos-test-${crypto.randomUUID()}`);
+    origHome = process.env.HOME ?? os.homedir();
+    process.env.HOME = tmpDir;
+  });
+
+  afterEach(() => {
+    process.env.HOME = origHome;
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test("returns empty array when directory does not exist", () => {
+    expect(listConversations("-nonexistent")).toEqual([]);
+  });
+
+  test("lists JSONL files sorted by mtime (newest first)", () => {
+    const dir = path.join(tmpDir, ".claude", "projects", "-test-dir");
+    fs.mkdirSync(dir, { recursive: true });
+
+    const id1 = "aaaa-1111";
+    const id2 = "bbbb-2222";
+    fs.writeFileSync(path.join(dir, `${id1}.jsonl`), "{}");
+    // Ensure different mtimes
+    const now = Date.now();
+    fs.utimesSync(path.join(dir, `${id1}.jsonl`), new Date(now - 10000), new Date(now - 10000));
+    fs.writeFileSync(path.join(dir, `${id2}.jsonl`), "{}");
+
+    const result = listConversations("-test-dir");
+    expect(result).toHaveLength(2);
+    expect(result[0].sessionId).toBe(id2); // newer
+    expect(result[1].sessionId).toBe(id1); // older
+  });
+
+  test("ignores non-JSONL files", () => {
+    const dir = path.join(tmpDir, ".claude", "projects", "-test-dir2");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "test.jsonl"), "{}");
+    fs.writeFileSync(path.join(dir, "readme.txt"), "hello");
+    fs.mkdirSync(path.join(dir, "subagents"));
+
+    const result = listConversations("-test-dir2");
+    expect(result).toHaveLength(1);
+    expect(result[0].sessionId).toBe("test");
   });
 });
