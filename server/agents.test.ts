@@ -109,19 +109,15 @@ describe("launchAgent", () => {
     expect(agent.directory).toBe("/tmp/test");
   });
 
-  it("sends initial prompt when provided", () => {
+  it("stores initial prompt but does not send it immediately", () => {
     const prompt = "Fix the bug in main.ts";
-    launchAgent("enc-dir", "/tmp/test", prompt);
-    expect(mockTmux.sendInput).toHaveBeenCalledWith(expect.stringMatching(/^orch-/), prompt);
+    const agent = launchAgent("enc-dir", "/tmp/test", prompt);
+    expect(agent.initialPrompt).toBe(prompt);
+    expect(mockTmux.sendInput).not.toHaveBeenCalled();
   });
 
   it("does not call sendInput when no prompt", () => {
     launchAgent("enc-dir", "/tmp/test");
-    expect(mockTmux.sendInput).not.toHaveBeenCalled();
-  });
-
-  it("does not call sendInput for blank prompt", () => {
-    launchAgent("enc-dir", "/tmp/test", "   ");
     expect(mockTmux.sendInput).not.toHaveBeenCalled();
   });
 
@@ -286,6 +282,42 @@ describe("pollAgent", () => {
     pollAgent("orphan-789");
     expect(agent?.directory).toBe("/tmp/discovered");
     expect(agent?.encodedDir).toBe("-tmp-discovered");
+  });
+
+  it("sends deferred initial prompt when session ID is discovered", () => {
+    const prompt = "Fix the bug in main.ts";
+    const agent = launchAgent("enc-dir", "/tmp/test", prompt);
+    expect(mockTmux.sendInput).not.toHaveBeenCalled();
+
+    // Poll with session ID in capture
+    mockTmux.capturePane.mockReturnValue(
+      "some output\n  session: abc00000-1234-5678-9abc-def012345678\n",
+    );
+    pollAgent(agent.id);
+    expect(mockTmux.sendInput).toHaveBeenCalledWith(agent.tmuxSession, prompt);
+  });
+
+  it("does not re-send initial prompt on subsequent polls", () => {
+    const agent = launchAgent("enc-dir", "/tmp/test", "Fix it");
+    mockTmux.capturePane.mockReturnValue(
+      "some output\n  session: abc00000-1234-5678-9abc-def012345678\n",
+    );
+    pollAgent(agent.id);
+    expect(mockTmux.sendInput).toHaveBeenCalledTimes(1);
+
+    // Poll again — should not re-send
+    mockTmux.sendInput.mockReset();
+    pollAgent(agent.id);
+    expect(mockTmux.sendInput).not.toHaveBeenCalled();
+  });
+
+  it("does not send initial prompt when agent has no prompt", () => {
+    const agent = launchAgent("enc-dir", "/tmp/test");
+    mockTmux.capturePane.mockReturnValue(
+      "some output\n  session: abc00000-1234-5678-9abc-def012345678\n",
+    );
+    pollAgent(agent.id);
+    expect(mockTmux.sendInput).not.toHaveBeenCalled();
   });
 
   it("does not re-discover session once claudeSessionId is set", () => {

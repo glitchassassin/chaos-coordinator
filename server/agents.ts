@@ -31,6 +31,9 @@ interface PollState {
 }
 const pollState = new Map<string, PollState>();
 
+/** Tracks agents whose initial prompt has been sent (after Claude is ready). */
+const initialPromptSent = new Set<string>();
+
 function sessionName(agentId: string): string {
   return `${SESSION_PREFIX}${agentId}`;
 }
@@ -50,9 +53,6 @@ export function launchAgent(
   const session = sessionName(id);
 
   tmux.createSession(session, directory, "claude");
-  if (initialPrompt?.trim()) {
-    tmux.sendInput(session, initialPrompt);
-  }
 
   const agent: RunningAgent = {
     id,
@@ -103,6 +103,7 @@ export function terminateAgent(agentId: string): void {
 
   agents.delete(agentId);
   pollState.delete(agentId);
+  initialPromptSent.delete(agentId);
 }
 
 /** List running agents, optionally filtered by encoded directory. */
@@ -192,6 +193,7 @@ export function pollAgent(agentId: string): void {
     console.log(`[agent ${agentId.slice(0, 8)}] session gone — removing`);
     agents.delete(agentId);
     pollState.delete(agentId);
+    initialPromptSent.delete(agentId);
     return;
   }
 
@@ -235,6 +237,13 @@ export function pollAgent(agentId: string): void {
         );
       }
       console.log(`[agent ${agentId.slice(0, 8)}] linked to session ${sessionId.slice(0, 8)}`);
+
+      // Send deferred initial prompt now that Claude is ready
+      if (agent.initialPrompt && !initialPromptSent.has(agentId)) {
+        initialPromptSent.add(agentId);
+        tmux.sendInput(agent.tmuxSession, agent.initialPrompt);
+        console.log(`[agent ${agentId.slice(0, 8)}] sent initial prompt`);
+      }
     }
   }
 }
@@ -258,6 +267,7 @@ export function startPolling(): () => void {
 export function _clearAgents(): void {
   agents.clear();
   pollState.clear();
+  initialPromptSent.clear();
 }
 
 // ── Auto-start ────────────────────────────────────────────────────────────────

@@ -45,23 +45,17 @@ function send(ws: WsLike, data: unknown): void {
   }
 }
 
-export function resolveLogPath(sessionId: string, encodedDir: string): string | null {
-  const logPath = path.join(
+export function logPathFor(sessionId: string, encodedDir: string): string {
+  return path.join(
     os.homedir(),
     ".claude",
     "projects",
     encodedDir,
     `${sessionId}.jsonl`,
   );
-  try {
-    fs.accessSync(logPath);
-    return logPath;
-  } catch {
-    return null;
-  }
 }
 
-function startWatcher(key: ClientKey, logPath: string): void {
+function startFileWatcher(key: ClientKey, logPath: string): void {
   if (watchers.has(key)) return;
   const unwatch = watchLog(logPath, (entries) => {
     for (const ws of getClients(key)) {
@@ -69,6 +63,38 @@ function startWatcher(key: ClientKey, logPath: string): void {
     }
   });
   watchers.set(key, unwatch);
+}
+
+/**
+ * Ensure a watcher is running for the given log path.
+ * If the file doesn't exist yet (new agent), poll every 2s until it appears,
+ * then switch to the real file watcher.
+ */
+function ensureWatcher(key: ClientKey, logPath: string): void {
+  if (watchers.has(key)) return;
+
+  if (fs.existsSync(logPath)) {
+    startFileWatcher(key, logPath);
+    return;
+  }
+
+  // File doesn't exist yet — poll for its creation
+  const timer = setInterval(() => {
+    if (!fs.existsSync(logPath)) return;
+    clearInterval(timer);
+
+    // Broadcast initial entries to all connected clients
+    const entries = readLog(logPath);
+    for (const ws of getClients(key)) {
+      send(ws, { type: "entries", entries });
+    }
+
+    // Replace the polling cleanup with the real file watcher
+    watchers.delete(key);
+    startFileWatcher(key, logPath);
+  }, 2_000);
+
+  watchers.set(key, () => { clearInterval(timer); });
 }
 
 function cleanup(key: ClientKey, ws: WsLike): void {
@@ -90,11 +116,14 @@ export function handleWsOpen(ws: WsLike, sessionId: string, encodedDir: string):
   const key = clientKey(sessionId, encodedDir);
   getClients(key).add(ws);
 
-  const logPath = resolveLogPath(sessionId, encodedDir);
-  if (!logPath) return;
+  const logPath = logPathFor(sessionId, encodedDir);
 
-  send(ws, { type: "entries", entries: readLog(logPath) });
-  startWatcher(key, logPath);
+  // Send current entries if the file already exists
+  if (fs.existsSync(logPath)) {
+    send(ws, { type: "entries", entries: readLog(logPath) });
+  }
+
+  ensureWatcher(key, logPath);
 }
 
 /** Unregister a WebSocket client. Cleans up watchers when last client disconnects. */
