@@ -247,8 +247,9 @@ body {
 }
 
 /* ─── Kaleido 3 syntax theme ───────────────────────────────────────────────
-   Colors are deliberately saturated so they survive e-ink's muted rendering.
-   All tones are dark enough for solid contrast on white.
+   No color — uses font weight and italics only for e-ink clarity.
+   Principle: highlight selectively. Keywords are noise; constants and
+   definitions matter. Comments are important — don't hide them.
    ─────────────────────────────────────────────────────────────────────── */
 
 .hljs {
@@ -256,92 +257,88 @@ body {
   background: transparent;
 }
 
-/* Keywords — dark navy: if, for, const, class, return … */
+/* Punctuation — dim so names stand out */
+.hljs-punctuation {
+  opacity: 0.4;
+}
+
+/* Keywords — unstyled. `if`, `for`, `const` are noise, not signal. */
 .hljs-keyword,
 .hljs-selector-tag,
 .hljs-doctag {
-  color: #0033aa;
-  font-weight: bold;
 }
 
-/* Strings and regexp literals — dark forest green */
+/* Strings and regexp literals — italic; constants are worth marking */
 .hljs-string,
 .hljs-regexp,
-.hljs-attribute,
 .hljs-meta .hljs-string {
-  color: #1a6b1a;
+  font-style: italic;
 }
 
-/* Numbers and boolean/null literals — dark crimson */
+/* Numbers and boolean/null literals — bold; constants are worth marking */
 .hljs-number,
 .hljs-literal,
 .hljs-symbol,
 .hljs-bullet {
-  color: #8b0000;
+  font-weight: bold;
 }
 
-/* Function and class names — dark purple */
+/* Function and class definition names — bold; top-level definitions matter */
 .hljs-title,
 .hljs-title.function_,
 .hljs-title.class_ {
-  color: #5c0099;
+  font-weight: bold;
 }
 
-/* Built-in functions and types — dark teal */
+/* Built-ins and types — unstyled; common enough to be noise */
 .hljs-built_in,
 .hljs-type {
-  color: #006666;
 }
 
-/* Comments — muted gray, italic */
+/* Comments — bold italic; good comments carry meaning, don't hide them */
 .hljs-comment,
 .hljs-quote {
-  color: #595959;
+  font-weight: bold;
   font-style: italic;
 }
 
-/* Meta / preprocessor / decorators — dark amber */
+/* Meta / preprocessor / decorators — italic */
 .hljs-meta,
 .hljs-meta .hljs-keyword {
-  color: #8b4400;
+  font-style: italic;
 }
 
-/* Diff additions and deletions */
+/* Diff additions — bold */
 .hljs-addition {
-  color: #1a6b1a;
+  font-weight: bold;
 }
+/* Diff deletions — italic */
 .hljs-deletion {
-  color: #8b0000;
+  font-style: italic;
 }
 
-/* HTML/XML tag names */
+/* HTML/XML tag names — bold */
 .hljs-name,
 .hljs-tag {
-  color: #0033aa;
+  font-weight: bold;
 }
 
-/* HTML/XML attributes */
-.hljs-attr {
-  color: #006666;
+/* HTML/XML attributes — italic */
+.hljs-attr,
+.hljs-attribute {
+  font-style: italic;
 }
 
-/* CSS selectors */
+/* CSS selectors — bold */
 .hljs-selector-id,
 .hljs-selector-class,
 .hljs-selector-pseudo {
-  color: #5c0099;
+  font-weight: bold;
 }
 
 /* Section headings in markup (e.g. Markdown) */
 .hljs-section {
-  color: #0033aa;
   font-weight: bold;
-}
-
-/* Template-literal substitutions, link text */
-.hljs-subst,
-.hljs-link {
-  color: #000;
 }
 
 /* Emphasis / strong (Markdown) */
