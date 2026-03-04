@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "preact/hooks";
+import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { InstanceList } from "./components/instance-list.js";
 import { SessionList } from "./components/session-list.js";
 import { Chat } from "./components/chat.js";
@@ -25,6 +25,13 @@ export function App() {
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [view, setView] = useState<View>("main");
+  // sessionId -> instanceId for unread tracking (default: all read on open)
+  const [unreadSessions, setUnreadSessions] = useState<Map<string, string>>(() => new Map());
+
+  const selectedSessionRef = useRef<string | null>(selectedSession);
+  const selectedInstanceRef = useRef<string | null>(selectedInstance);
+  useEffect(() => { selectedSessionRef.current = selectedSession; }, [selectedSession]);
+  useEffect(() => { selectedInstanceRef.current = selectedInstance; }, [selectedInstance]);
 
   const loadInstances = useCallback(() => {
     fetch("/api/instances")
@@ -61,8 +68,17 @@ export function App() {
   }, [selectedInstance]);
 
   useEffect(() => {
-    if (selectedSession) sessionStorage.setItem("selectedSession", selectedSession);
-    else sessionStorage.removeItem("selectedSession");
+    if (selectedSession) {
+      sessionStorage.setItem("selectedSession", selectedSession);
+      setUnreadSessions((prev) => {
+        if (!prev.has(selectedSession)) return prev;
+        const next = new Map(prev);
+        next.delete(selectedSession);
+        return next;
+      });
+    } else {
+      sessionStorage.removeItem("selectedSession");
+    }
   }, [selectedSession]);
 
   // Load sessions when instance changes
@@ -106,12 +122,27 @@ export function App() {
             }
             return [...prev, info];
           });
+          // Mark unread if this isn't the currently open session
+          if (info.id !== selectedSessionRef.current && selectedInstanceRef.current) {
+            const instanceId = selectedInstanceRef.current;
+            setUnreadSessions((prev) => {
+              const next = new Map(prev);
+              next.set(info.id, instanceId);
+              return next;
+            });
+          }
         }
       }
       if (evt.type === "session.deleted") {
         const info = evt.properties.info as Session;
         if (info && info.id) {
           setSessions((prev) => prev.filter((s) => s.id !== info.id));
+          setUnreadSessions((prev) => {
+            if (!prev.has(info.id)) return prev;
+            const next = new Map(prev);
+            next.delete(info.id);
+            return next;
+          });
         }
       }
     },
@@ -221,6 +252,15 @@ export function App() {
   const selectedName =
     instances.find((i) => i.id === selectedInstance)?.name || "";
 
+  const unreadSessionIds = new Set(unreadSessions.keys());
+  const unreadInstanceIds = new Set(unreadSessions.values());
+
+  const sortedSessions = [...sessions].sort((a, b) => {
+    const aTime = a.time?.updated ?? a.time?.created ?? 0;
+    const bTime = b.time?.updated ?? b.time?.created ?? 0;
+    return bTime - aTime;
+  });
+
   return (
     <div class="layout">
       {sidebarOpen && (
@@ -231,15 +271,17 @@ export function App() {
             onSelect={(id) => { setSelectedInstance(id); setView("main"); }}
             onNew={handleNewInstance}
             onRemove={handleRemoveInstance}
+            unreadIds={unreadInstanceIds}
           />
           {selectedInstance && (
             <SessionList
-              sessions={sessions}
+              sessions={sortedSessions}
               selected={selectedSession}
               onSelect={setSelectedSession}
               onCreate={handleCreateSession}
               onDelete={handleDeleteSession}
               loading={sessionsLoading}
+              unreadIds={unreadSessionIds}
             />
           )}
         </aside>

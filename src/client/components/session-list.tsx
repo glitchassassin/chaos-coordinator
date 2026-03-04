@@ -13,6 +13,7 @@ interface Props {
   onCreate: () => void;
   onDelete: (id: string) => void;
   loading: boolean;
+  unreadIds: Set<string>;
 }
 
 function DeleteButton({ onDelete, label }: { onDelete: () => void; label: string }) {
@@ -35,6 +36,7 @@ export function SessionList({
   onCreate,
   onDelete,
   loading,
+  unreadIds,
 }: Props) {
   return (
     <nav class="sidebar-section" style={{ flex: 1, overflow: "auto" }}>
@@ -53,7 +55,7 @@ export function SessionList({
             aria-selected={s.id === selected}
             onClick={() => onSelect(s.id)}
           >
-            {s.title || s.id.slice(0, 12)}
+            {s.title || s.id.slice(0, 12)}{unreadIds.has(s.id) ? " *" : ""}
           </button>
           <DeleteButton onDelete={() => onDelete(s.id)} label={`Delete session ${s.title || s.id.slice(0, 12)}`} />
         </div>
