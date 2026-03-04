@@ -1,3 +1,4 @@
+import { marked } from "marked";
 import type { Part, ToolPart } from "../types.js";
 
 interface Props {
@@ -34,10 +35,20 @@ function renderToolPart(part: ToolPart, i: number) {
   );
 }
 
-function renderPart(part: Part, i: number) {
+function renderPart(part: Part, i: number, role: string) {
   switch (part.type) {
     case "text":
       if (!part.text) return null;
+      if (role === "assistant") {
+        const html = marked(part.text, { async: false }) as string;
+        return (
+          <div
+            key={i}
+            class="message-content message-content--markdown"
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
+        );
+      }
       return (
         <div key={i} class="message-content">
           {part.text}
@@ -68,7 +79,7 @@ export function Message({ role, parts, showRole }: Props) {
   return (
     <article class={`message message--${role}`}>
       {showRole && <h3 class="message-role">{role}</h3>}
-      {parts.map(renderPart)}
+      {parts.map((p, i) => renderPart(p, i, role))}
     </article>
   );
 }
