@@ -3,7 +3,8 @@ import { InstanceList } from "./components/instance-list.js";
 import { SessionList } from "./components/session-list.js";
 import { Chat } from "./components/chat.js";
 import { DirectoryPicker } from "./components/directory-picker.js";
-import type { Instance, Session, MessageWithParts } from "./types.js";
+import { useSSE } from "./hooks/use-sse.js";
+import type { Instance, Session, MessageWithParts, SSEEvent } from "./types.js";
 
 type View = "main" | "new-instance";
 
@@ -13,9 +14,13 @@ function apiUrl(instanceId: string, path: string): string {
 
 export function App() {
   const [instances, setInstances] = useState<Instance[]>([]);
-  const [selectedInstance, setSelectedInstance] = useState<string | null>(null);
+  const [selectedInstance, setSelectedInstance] = useState<string | null>(
+    () => sessionStorage.getItem("selectedInstance")
+  );
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [selectedSession, setSelectedSession] = useState<string | null>(null);
+  const [selectedSession, setSelectedSession] = useState<string | null>(
+    () => sessionStorage.getItem("selectedSession")
+  );
   const [messages, setMessages] = useState<MessageWithParts[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -32,7 +37,14 @@ export function App() {
       })
       .then((list: Instance[]) => {
         setInstances(list);
-        if (list.length === 0) setView("new-instance");
+        if (list.length === 0) {
+          setView("new-instance");
+        } else {
+          // Clear restored instance if it no longer exists
+          setSelectedInstance((prev) =>
+            prev && list.some((i) => i.id === prev) ? prev : null
+          );
+        }
       })
       .catch(console.error);
   }, []);
@@ -41,6 +53,17 @@ export function App() {
   useEffect(() => {
     loadInstances();
   }, [loadInstances]);
+
+  // Persist selections
+  useEffect(() => {
+    if (selectedInstance) sessionStorage.setItem("selectedInstance", selectedInstance);
+    else sessionStorage.removeItem("selectedInstance");
+  }, [selectedInstance]);
+
+  useEffect(() => {
+    if (selectedSession) sessionStorage.setItem("selectedSession", selectedSession);
+    else sessionStorage.removeItem("selectedSession");
+  }, [selectedSession]);
 
   // Load sessions when instance changes
   useEffect(() => {
@@ -51,8 +74,6 @@ export function App() {
     }
 
     setSessionsLoading(true);
-    setSelectedSession(null);
-    setMessages([]);
 
     fetch(apiUrl(selectedInstance, "/session"))
       .then((r) => r.json())
@@ -61,10 +82,43 @@ export function App() {
           ? data
           : Object.values(data || {});
         setSessions(list);
+        // If restored session no longer exists, clear it
+        setSelectedSession((prev) =>
+          prev && list.some((s) => s.id === prev) ? prev : null
+        );
       })
       .catch(console.error)
       .finally(() => setSessionsLoading(false));
   }, [selectedInstance]);
+
+  // Listen for session updates via SSE
+  const handleSessionEvent = useCallback(
+    (evt: SSEEvent) => {
+      if (evt.type === "session.updated" || evt.type === "session.created") {
+        const info = evt.properties.info as Session;
+        if (info && info.id) {
+          setSessions((prev) => {
+            const idx = prev.findIndex((s) => s.id === info.id);
+            if (idx >= 0) {
+              const updated = [...prev];
+              updated[idx] = { ...updated[idx], ...info };
+              return updated;
+            }
+            return [...prev, info];
+          });
+        }
+      }
+      if (evt.type === "session.deleted") {
+        const info = evt.properties.info as Session;
+        if (info && info.id) {
+          setSessions((prev) => prev.filter((s) => s.id !== info.id));
+        }
+      }
+    },
+    [],
+  );
+
+  useSSE(selectedInstance, handleSessionEvent);
 
   // Load messages when session changes
   useEffect(() => {
