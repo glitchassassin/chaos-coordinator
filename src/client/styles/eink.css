@@ -271,100 +271,86 @@ body {
    definitions matter. Comments are important — don't hide them.
    ─────────────────────────────────────────────────────────────────────── */
 
-.hljs {
+.hljs,
+code[class*="language-"] {
   color: #000;
   background: transparent;
 }
 
 /* Punctuation — dim so names stand out */
-.hljs-punctuation {
+.token.punctuation {
   opacity: 0.4;
 }
 
 /* Keywords — unstyled. `if`, `for`, `const` are noise, not signal. */
-.hljs-keyword,
-.hljs-selector-tag,
-.hljs-doctag {
+.token.keyword,
+.token.tag {
 }
 
 /* Strings and regexp literals — italic; constants are worth marking */
-.hljs-string,
-.hljs-regexp,
-.hljs-meta .hljs-string {
+.token.string,
+.token.regex,
+.token.template-string {
   font-style: italic;
 }
 
 /* Numbers and boolean/null literals — bold; constants are worth marking */
-.hljs-number,
-.hljs-literal,
-.hljs-symbol,
-.hljs-bullet {
+.token.number,
+.token.boolean {
   font-weight: bold;
 }
 
 /* Function and class definition names — bold; top-level definitions matter */
-.hljs-title,
-.hljs-title.function_,
-.hljs-title.class_ {
+.token.function,
+.token.class-name {
   font-weight: bold;
 }
 
-/* Built-ins and types — unstyled; common enough to be noise */
-.hljs-built_in,
-.hljs-type {
-}
-
 /* Comments — bold italic; good comments carry meaning, don't hide them */
-.hljs-comment,
-.hljs-quote {
+.token.comment,
+.token.prolog,
+.token.doctype {
   font-weight: bold;
   font-style: italic;
 }
 
 /* Meta / preprocessor / decorators — italic */
-.hljs-meta,
-.hljs-meta .hljs-keyword {
+.token.decorator,
+.token.annotation,
+.token.directive {
   font-style: italic;
 }
 
 /* Diff additions — bold */
-.hljs-addition {
+.token.inserted {
   font-weight: bold;
 }
 /* Diff deletions — italic */
-.hljs-deletion {
+.token.deleted {
   font-style: italic;
 }
 
 /* HTML/XML tag names — bold */
-.hljs-name,
-.hljs-tag {
+.token.tag .token.tag {
   font-weight: bold;
 }
 
 /* HTML/XML attributes — italic */
-.hljs-attr,
-.hljs-attribute {
+.token.attr-name,
+.token.attr-value {
   font-style: italic;
 }
 
 /* CSS selectors — bold */
-.hljs-selector-id,
-.hljs-selector-class,
-.hljs-selector-pseudo {
-  font-weight: bold;
-}
-
-/* Section headings in markup (e.g. Markdown) */
-.hljs-section {
+.token.selector {
   font-weight: bold;
 }
 
 /* Emphasis / strong (Markdown) */
-.hljs-emphasis {
+.token.italic {
   font-style: italic;
 }
-.hljs-strong {
+.token.bold {
   font-weight: bold;
 }
 
