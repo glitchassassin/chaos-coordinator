@@ -1,25 +1,24 @@
-import { useEffect, useRef, useCallback, useState } from "preact/hooks";
+import { useEffect, useRef, useCallback } from "preact/hooks";
 import { instanceUrl } from "./use-api.js";
 import type { SSEEvent } from "../types.js";
 
-type Listener = (event: SSEEvent) => void;
+type Listener = (event: SSEEvent, instanceId: string) => void;
 
 export function useSSE(
-  instanceId: string | null,
+  instanceIds: string[],
   onEvent: Listener,
 ) {
-  const [connected, setConnected] = useState(false);
   const onEventRef = useRef(onEvent);
   onEventRef.current = onEvent;
 
   // Buffer events and flush on idle to reduce e-ink redraws
-  const bufferRef = useRef<SSEEvent[]>([]);
+  const bufferRef = useRef<Array<{ evt: SSEEvent; instanceId: string }>>([]);
   const flushScheduled = useRef(false);
 
   const flush = useCallback(() => {
     const batch = bufferRef.current.splice(0);
-    for (const evt of batch) {
-      onEventRef.current(evt);
+    for (const { evt, instanceId } of batch) {
+      onEventRef.current(evt, instanceId);
     }
     flushScheduled.current = false;
   }, []);
@@ -34,34 +33,33 @@ export function useSSE(
     }
   }, [flush]);
 
+  const key = instanceIds.join(",");
+
   useEffect(() => {
-    if (!instanceId) return;
+    if (instanceIds.length === 0) return;
 
-    // Global SSE endpoint — one per opencode instance
-    const url = instanceUrl(instanceId, "/event");
-    const es = new EventSource(url);
+    const sources = instanceIds.map((instanceId) => {
+      const url = instanceUrl(instanceId, "/event");
+      const es = new EventSource(url);
 
-    es.onopen = () => setConnected(true);
-
-    es.onmessage = (e) => {
-      try {
-        const parsed: SSEEvent = JSON.parse(e.data);
-        if (parsed.type && parsed.properties) {
-          bufferRef.current.push(parsed);
-          scheduleFlush();
+      es.onmessage = (e) => {
+        try {
+          const parsed: SSEEvent = JSON.parse(e.data);
+          if (parsed.type && parsed.properties) {
+            bufferRef.current.push({ evt: parsed, instanceId });
+            scheduleFlush();
+          }
+        } catch {
+          // ignore unparseable
         }
-      } catch {
-        // ignore unparseable
-      }
-    };
+      };
 
-    es.onerror = () => setConnected(false);
+      return es;
+    });
 
     return () => {
-      es.close();
-      setConnected(false);
+      for (const es of sources) es.close();
     };
-  }, [instanceId, scheduleFlush]);
-
-  return { connected };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, scheduleFlush]);
 }

@@ -132,24 +132,26 @@ export function App() {
       .catch(() => {});
   }, [selectedInstance]);
 
-  // Listen for session updates via SSE
+  // Listen for session updates via SSE for all instances
   const handleSessionEvent = useCallback(
-    (evt: SSEEvent) => {
+    (evt: SSEEvent, instanceId: string) => {
       if (evt.type === "session.updated" || evt.type === "session.created") {
         const info = evt.properties.info as Session;
         if (info && info.id) {
-          setSessions((prev) => {
-            const idx = prev.findIndex((s) => s.id === info.id);
-            if (idx >= 0) {
-              const updated = [...prev];
-              updated[idx] = { ...updated[idx], ...info };
-              return updated;
-            }
-            return [...prev, info];
-          });
+          // Only update sessions state if event is from the currently selected instance
+          if (instanceId === selectedInstanceRef.current) {
+            setSessions((prev) => {
+              const idx = prev.findIndex((s) => s.id === info.id);
+              if (idx >= 0) {
+                const updated = [...prev];
+                updated[idx] = { ...updated[idx], ...info };
+                return updated;
+              }
+              return [...prev, info];
+            });
+          }
           // Mark unread if this isn't the currently open session
-          if (info.id !== selectedSessionRef.current && selectedInstanceRef.current) {
-            const instanceId = selectedInstanceRef.current;
+          if (info.id !== selectedSessionRef.current) {
             setUnreadSessions((prev) => {
               const next = new Map(prev);
               next.set(info.id, instanceId);
@@ -161,7 +163,9 @@ export function App() {
       if (evt.type === "session.deleted") {
         const info = evt.properties.info as Session;
         if (info && info.id) {
-          setSessions((prev) => prev.filter((s) => s.id !== info.id));
+          if (instanceId === selectedInstanceRef.current) {
+            setSessions((prev) => prev.filter((s) => s.id !== info.id));
+          }
           setUnreadSessions((prev) => {
             if (!prev.has(info.id)) return prev;
             const next = new Map(prev);
@@ -171,10 +175,9 @@ export function App() {
         }
       }
 
-      if (evt.type === "permission.asked" && selectedInstanceRef.current) {
+      if (evt.type === "permission.asked") {
         const perm = evt.properties as unknown as { id: string; sessionID: string };
         if (perm.id && perm.sessionID) {
-          const instanceId = selectedInstanceRef.current;
           setPendingPermissions((prev) => {
             if (prev.has(perm.id)) return prev;
             const next = new Map(prev);
@@ -199,7 +202,8 @@ export function App() {
     [],
   );
 
-  useSSE(selectedInstance, handleSessionEvent);
+  const allInstanceIds = instances.map((i) => i.id);
+  useSSE(allInstanceIds, handleSessionEvent);
 
   // Load messages when session changes
   useEffect(() => {

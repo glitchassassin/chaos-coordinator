@@ -43,7 +43,7 @@ export function Chat({ instanceId, sessionId, initialMessages, onSend }: Props) 
 
   // SSE event handler — filter to current session
   const handleEvent = useCallback(
-    (evt: SSEEvent) => {
+    (evt: SSEEvent, _instanceId: string) => {
       const props = evt.properties;
 
       if (evt.type === "message.updated") {
@@ -135,7 +135,7 @@ export function Chat({ instanceId, sessionId, initialMessages, onSend }: Props) 
     [sessionId],
   );
 
-  useSSE(instanceId, handleEvent);
+  useSSE([instanceId], handleEvent);
 
   const replyPermission = useCallback(
     async (requestId: string, reply: "once" | "always" | "reject") => {
