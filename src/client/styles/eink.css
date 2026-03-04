@@ -97,7 +97,7 @@ body {
 .sidebar-item {
   display: block;
   width: 100%;
-  padding: 0.75rem;
+  padding: 0.35rem 0.75rem;
   font-size: 1rem;
   background: #fff;
   color: #000;
@@ -526,6 +526,16 @@ code[class*="language-"] {
   background: #000;
   color: #fff;
   border: 2px solid #000;
+}
+
+/* Remote provider icon */
+.remote-icon {
+  display: inline-block;
+  width: 1.5em;
+  height: 1.5em;
+  vertical-align: middle;
+  margin-right: 0.4rem;
+  flex-shrink: 0;
 }
 
 /* Directory picker */

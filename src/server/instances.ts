@@ -6,6 +6,7 @@ export interface Instance {
   name: string;
   port: number;
   directory: string;
+  remote?: "github" | "azuredevops";
 }
 
 const INSTANCES_PATH = resolve(process.cwd(), "instances.json");

@@ -2,6 +2,17 @@ import { Hono } from "hono";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
+
+function detectGitRemote(directory: string): "github" | "azuredevops" | undefined {
+  try {
+    const config = readFileSync(join(directory, ".git", "config"), "utf-8");
+    if (config.includes("github.com")) return "github";
+    if (config.includes("dev.azure.com") || config.includes("visualstudio.com")) return "azuredevops";
+  } catch {
+    // not a git repo or no remote
+  }
+  return undefined;
+}
 import { homedir } from "node:os";
 import {
   resolvePassword,
@@ -86,7 +97,8 @@ app.post("/api/instances", async (c) => {
   const port = getNextPort();
   const instanceName = name?.trim() || basename(directory);
 
-  const instance = { id, name: instanceName, port, directory };
+  const remote = detectGitRemote(directory);
+  const instance = { id, name: instanceName, port, directory, ...(remote ? { remote } : {}) };
   addInstance(instance);
   spawnInstance(id, directory, port);
 

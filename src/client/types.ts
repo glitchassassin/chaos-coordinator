@@ -5,6 +5,7 @@ export interface Instance {
   name: string;
   port: number;
   directory: string;
+  remote?: "github" | "azuredevops";
 }
 
 export interface Session {
