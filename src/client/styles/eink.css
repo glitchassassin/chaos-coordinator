@@ -218,6 +218,112 @@ body {
   font-size: 1rem;
 }
 
+/* ─── Kaleido 3 syntax theme ───────────────────────────────────────────────
+   Colors are deliberately saturated so they survive e-ink's muted rendering.
+   All tones are dark enough for solid contrast on white.
+   ─────────────────────────────────────────────────────────────────────── */
+
+.hljs {
+  color: #000;
+  background: transparent;
+}
+
+/* Keywords — dark navy: if, for, const, class, return … */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-doctag {
+  color: #0033aa;
+  font-weight: bold;
+}
+
+/* Strings and regexp literals — dark forest green */
+.hljs-string,
+.hljs-regexp,
+.hljs-attribute,
+.hljs-meta .hljs-string {
+  color: #1a6b1a;
+}
+
+/* Numbers and boolean/null literals — dark crimson */
+.hljs-number,
+.hljs-literal,
+.hljs-symbol,
+.hljs-bullet {
+  color: #8b0000;
+}
+
+/* Function and class names — dark purple */
+.hljs-title,
+.hljs-title.function_,
+.hljs-title.class_ {
+  color: #5c0099;
+}
+
+/* Built-in functions and types — dark teal */
+.hljs-built_in,
+.hljs-type {
+  color: #006666;
+}
+
+/* Comments — muted gray, italic */
+.hljs-comment,
+.hljs-quote {
+  color: #595959;
+  font-style: italic;
+}
+
+/* Meta / preprocessor / decorators — dark amber */
+.hljs-meta,
+.hljs-meta .hljs-keyword {
+  color: #8b4400;
+}
+
+/* Diff additions and deletions */
+.hljs-addition {
+  color: #1a6b1a;
+}
+.hljs-deletion {
+  color: #8b0000;
+}
+
+/* HTML/XML tag names */
+.hljs-name,
+.hljs-tag {
+  color: #0033aa;
+}
+
+/* HTML/XML attributes */
+.hljs-attr {
+  color: #006666;
+}
+
+/* CSS selectors */
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-selector-pseudo {
+  color: #5c0099;
+}
+
+/* Section headings in markup (e.g. Markdown) */
+.hljs-section {
+  color: #0033aa;
+  font-weight: bold;
+}
+
+/* Template-literal substitutions, link text */
+.hljs-subst,
+.hljs-link {
+  color: #000;
+}
+
+/* Emphasis / strong (Markdown) */
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: bold;
+}
+
 .message-content p {
   margin-bottom: 0.5rem;
 }
