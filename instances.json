@@ -1,8 +1,0 @@
-[
-  {
-    "id": "example-project",
-    "name": "Example Project",
-    "port": 4096,
-    "directory": "/tmp/example-project"
-  }
-]
