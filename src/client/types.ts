@@ -81,3 +81,9 @@ export interface SSEEvent {
   type: string;
   properties: Record<string, unknown>;
 }
+
+// Filesystem entry for directory picker
+export interface FsEntry {
+  name: string;
+  path: string;
+}

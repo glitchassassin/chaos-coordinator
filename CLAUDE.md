@@ -5,3 +5,5 @@ It should take design inspiration from printed matter, with an emphasis on typog
 Make sure that the minimum font size is 18px, minimum border size is 2px.
 
 Buttons should be solid black with white text.
+
+Do not use hover styles. E-ink tablets do not support hover — use only focus and active states for interactivity feedback.

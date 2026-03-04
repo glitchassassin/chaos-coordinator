@@ -1,4 +1,4 @@
-import { readFileSync, watchFile } from "node:fs";
+import { readFileSync, writeFileSync, watchFile } from "node:fs";
 import { resolve } from "node:path";
 
 export interface Instance {
@@ -22,6 +22,10 @@ function load(): void {
   }
 }
 
+function save(): void {
+  writeFileSync(INSTANCES_PATH, JSON.stringify(instances, null, 2) + "\n", "utf-8");
+}
+
 export function initInstances(): void {
   load();
   watchFile(INSTANCES_PATH, { interval: 2000 }, () => {
@@ -36,4 +40,14 @@ export function getInstances(): Instance[] {
 
 export function getInstance(id: string): Instance | undefined {
   return instances.find((i) => i.id === id);
+}
+
+export function addInstance(instance: Instance): void {
+  instances = [...instances, instance];
+  save();
+}
+
+export function removeInstance(id: string): void {
+  instances = instances.filter((i) => i.id !== id);
+  save();
 }

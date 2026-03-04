@@ -2,7 +2,10 @@ import { useState, useEffect, useCallback } from "preact/hooks";
 import { InstanceList } from "./components/instance-list.js";
 import { SessionList } from "./components/session-list.js";
 import { Chat } from "./components/chat.js";
+import { DirectoryPicker } from "./components/directory-picker.js";
 import type { Instance, Session, MessageWithParts } from "./types.js";
+
+type View = "main" | "new-instance";
 
 function apiUrl(instanceId: string, path: string): string {
   return `/api/instances/${instanceId}${path}`;
@@ -16,9 +19,9 @@ export function App() {
   const [messages, setMessages] = useState<MessageWithParts[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [view, setView] = useState<View>("main");
 
-  // Load instances
-  useEffect(() => {
+  const loadInstances = useCallback(() => {
     fetch("/api/instances")
       .then((r) => {
         if (r.status === 401) {
@@ -27,9 +30,17 @@ export function App() {
         }
         return r.json();
       })
-      .then(setInstances)
+      .then((list: Instance[]) => {
+        setInstances(list);
+        if (list.length === 0) setView("new-instance");
+      })
       .catch(console.error);
   }, []);
+
+  // Load instances
+  useEffect(() => {
+    loadInstances();
+  }, [loadInstances]);
 
   // Load sessions when instance changes
   useEffect(() => {
@@ -105,6 +116,41 @@ export function App() {
     [selectedInstance, selectedSession],
   );
 
+  const handleNewInstance = useCallback(() => {
+    setView("new-instance");
+  }, []);
+
+  const handleInstanceSelect = useCallback(async (path: string, name: string) => {
+    try {
+      const res = await fetch("/api/instances", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ directory: path, name }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        console.error("Failed to create instance:", err);
+        return;
+      }
+      await loadInstances();
+      setView("main");
+    } catch (e) {
+      console.error("Failed to create instance:", e);
+    }
+  }, [loadInstances]);
+
+  const handleRemoveInstance = useCallback(async (id: string) => {
+    try {
+      await fetch(`/api/instances/${id}`, { method: "DELETE" });
+      if (selectedInstance === id) {
+        setSelectedInstance(null);
+      }
+      await loadInstances();
+    } catch (e) {
+      console.error("Failed to remove instance:", e);
+    }
+  }, [selectedInstance, loadInstances]);
+
   const selectedName =
     instances.find((i) => i.id === selectedInstance)?.name || "";
 
@@ -115,7 +161,9 @@ export function App() {
           <InstanceList
             instances={instances}
             selected={selectedInstance}
-            onSelect={setSelectedInstance}
+            onSelect={(id) => { setSelectedInstance(id); setView("main"); }}
+            onNew={handleNewInstance}
+            onRemove={handleRemoveInstance}
           />
           {selectedInstance && (
             <SessionList
@@ -150,7 +198,11 @@ export function App() {
             </a>
           </div>
         </header>
-        {selectedInstance && selectedSession ? (
+        {view === "new-instance" ? (
+          <DirectoryPicker
+            onSelect={handleInstanceSelect}
+          />
+        ) : selectedInstance && selectedSession ? (
           <Chat
             instanceId={selectedInstance}
             sessionId={selectedSession}
