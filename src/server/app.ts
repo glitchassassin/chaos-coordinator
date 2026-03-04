@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { serveStatic } from "@hono/node-server/serve-static";
-import { readdirSync, statSync, existsSync } from "node:fs";
+import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
 import { homedir } from "node:os";
 import {
@@ -12,7 +12,7 @@ import {
   clearSessionCookie,
 } from "./auth.js";
 import { initInstances, getInstances, getInstance, addInstance, removeInstance } from "./instances.js";
-import { spawnInstance, killInstance, getNextPort } from "./process-manager.js";
+import { spawnInstance, killInstance, getNextPort, reservePort } from "./process-manager.js";
 import { proxy } from "./proxy.js";
 
 // Initialize once — safe to call multiple times (guarded internally)
@@ -20,6 +20,12 @@ if (!(globalThis as any).__appInitialized) {
   (globalThis as any).__appInitialized = true;
   initInstances();
   resolvePassword();
+
+  // Re-spawn persisted instances from previous session
+  for (const inst of getInstances()) {
+    reservePort(inst.port);
+    spawnInstance(inst.id, inst.directory, inst.port);
+  }
 }
 
 const app = new Hono();
@@ -104,25 +110,52 @@ app.get("/api/fs", (c) => {
   const home = homedir();
   const rawPath = c.req.query("path") || home;
   const safePath = rawPath.startsWith(home) ? rawPath : home;
+  const includeFiles = c.req.query("files") === "1";
 
-  let entries: { name: string; path: string }[] = [];
+  let entries: { name: string; path: string; type: "file" | "directory" }[] = [];
   try {
     const items = readdirSync(safePath);
-    entries = items
-      .filter((item) => {
-        try {
-          return statSync(join(safePath, item)).isDirectory();
-        } catch {
-          return false;
+    for (const item of items) {
+      if (item.startsWith(".")) continue;
+      try {
+        const stat = statSync(join(safePath, item));
+        const isDir = stat.isDirectory();
+        if (isDir || (includeFiles && stat.isFile())) {
+          entries.push({ name: item, path: join(safePath, item), type: isDir ? "directory" : "file" });
         }
-      })
-      .map((item) => ({ name: item, path: join(safePath, item) }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+      } catch {
+        // skip unreadable entries
+      }
+    }
+    entries.sort((a, b) => {
+      if (a.type !== b.type) return a.type === "directory" ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
   } catch {
     return c.json({ error: "Cannot read directory" }, 400);
   }
 
   return c.json({ path: safePath, entries });
+});
+
+// File read API
+app.get("/api/fs/content", (c) => {
+  const home = homedir();
+  const rawPath = c.req.query("path");
+  if (!rawPath || !rawPath.startsWith(home)) {
+    return c.json({ error: "Invalid path" }, 400);
+  }
+  try {
+    const stat = statSync(rawPath);
+    if (!stat.isFile()) return c.json({ error: "Not a file" }, 400);
+    if (stat.size > 1024 * 1024) return c.json({ content: "", binary: true });
+    const buf = readFileSync(rawPath);
+    const isBinary = buf.some((b) => b === 0);
+    if (isBinary) return c.json({ content: "", binary: true });
+    return c.json({ content: buf.toString("utf-8"), binary: false });
+  } catch {
+    return c.json({ error: "Cannot read file" }, 400);
+  }
 });
 
 // Reverse proxy to opencode instances

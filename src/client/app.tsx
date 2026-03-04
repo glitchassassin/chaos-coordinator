@@ -2,11 +2,14 @@ import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { InstanceList } from "./components/instance-list.js";
 import { SessionList } from "./components/session-list.js";
 import { Chat } from "./components/chat.js";
+import { GitStatus } from "./components/git-status.js";
+import { Explorer } from "./components/explorer.js";
 import { DirectoryPicker } from "./components/directory-picker.js";
 import { useSSE } from "./hooks/use-sse.js";
 import type { Instance, Session, MessageWithParts, SSEEvent } from "./types.js";
 
 type View = "main" | "new-instance";
+type SessionView = "chat" | "git" | "explorer";
 
 function apiUrl(instanceId: string, path: string): string {
   return `/api/instances/${instanceId}${path}`;
@@ -25,6 +28,7 @@ export function App() {
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [view, setView] = useState<View>("main");
+  const [sessionView, setSessionView] = useState<SessionView>("chat");
   // sessionId -> instanceId for unread tracking (default: all read on open)
   const [unreadSessions, setUnreadSessions] = useState<Map<string, string>>(() => new Map());
   // requestId -> { sessionId, instanceId } for pending permission tracking
@@ -70,6 +74,7 @@ export function App() {
   }, [selectedInstance]);
 
   useEffect(() => {
+    setSessionView("chat");
     if (selectedSession) {
       sessionStorage.setItem("selectedSession", selectedSession);
       setUnreadSessions((prev) => {
@@ -362,6 +367,20 @@ export function App() {
                 : "Chaos Coordinator"}
             </h1>
           </div>
+          {selectedInstance && selectedSession && (
+            <div class="topbar-center">
+              {(["chat", "git", "explorer"] as const).map((v) => (
+                <button
+                  key={v}
+                  class="view-toggle-btn"
+                  aria-selected={sessionView === v}
+                  onClick={() => setSessionView(v)}
+                >
+                  {v === "chat" ? "Chat" : v === "git" ? "Git" : "Files"}
+                </button>
+              ))}
+            </div>
+          )}
           <div class="topbar-actions">
             <a href="/logout" class="btn">
               Logout
@@ -373,12 +392,18 @@ export function App() {
             onSelect={handleInstanceSelect}
           />
         ) : selectedInstance && selectedSession ? (
-          <Chat
-            instanceId={selectedInstance}
-            sessionId={selectedSession}
-            initialMessages={messages}
-            onSend={handleSendMessage}
-          />
+          sessionView === "git" ? (
+            <GitStatus instanceId={selectedInstance} />
+          ) : sessionView === "explorer" ? (
+            <Explorer instanceId={selectedInstance} rootPath={instances.find((i) => i.id === selectedInstance)?.directory || "/"} />
+          ) : (
+            <Chat
+              instanceId={selectedInstance}
+              sessionId={selectedSession}
+              initialMessages={messages}
+              onSend={handleSendMessage}
+            />
+          )
         ) : (
           <div class="empty-state">
             {!selectedInstance

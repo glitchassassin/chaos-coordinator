@@ -14,6 +14,12 @@ export function getNextPort(): number {
   return nextPort++;
 }
 
+export function reservePort(port: number): void {
+  if (port >= nextPort) {
+    nextPort = port + 1;
+  }
+}
+
 export function spawnInstance(id: string, directory: string, port: number): void {
   const child = spawn("opencode", ["serve", "--port", String(port)], {
     cwd: directory,

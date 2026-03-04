@@ -87,3 +87,30 @@ export interface FsEntry {
   name: string;
   path: string;
 }
+
+// Git file status from /file/status
+export interface FileStatus {
+  path: string;
+  added: number;
+  removed: number;
+  status: "added" | "deleted" | "modified";
+}
+
+// Directory listing entry from /file/file
+export interface FileNode {
+  name: string;
+  path: string;
+  absolute: string;
+  type: "file" | "directory";
+  ignored: boolean;
+}
+
+// File content from /file/content
+export interface FileContent {
+  type: string;
+  content: string;
+  diff?: string;
+  patch?: string;
+  encoding?: string;
+  mimeType?: string;
+}

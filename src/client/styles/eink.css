@@ -619,6 +619,245 @@ body {
   flex-shrink: 0;
 }
 
+/* View toggle buttons */
+.topbar-center {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.view-toggle-btn {
+  font-family: inherit;
+  font-size: 1rem;
+  font-variant: small-caps;
+  letter-spacing: 0.05em;
+  padding: 0.25rem 0.75rem;
+  background: #fff;
+  color: #000;
+  border: 2px solid #000;
+  cursor: pointer;
+  min-height: 36px;
+}
+
+.view-toggle-btn + .view-toggle-btn {
+  border-left: none;
+}
+
+.view-toggle-btn[aria-selected="true"] {
+  background: #000;
+  color: #fff;
+  font-weight: bold;
+}
+
+.view-toggle-btn:focus {
+  outline: 2px solid #000;
+  outline-offset: 2px;
+}
+
+.view-toggle-btn:active {
+  background: #000;
+  color: #fff;
+}
+
+/* Git status — full-width file list / diff views */
+.git-file-list,
+.git-diff-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.git-file-list-scroll {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.git-diff-scroll {
+  flex: 1;
+  overflow: auto;
+  padding: 1rem;
+}
+
+.git-diff-scroll pre {
+  margin: 0;
+}
+
+.git-diff-scroll code {
+  font-family: ui-monospace, monospace;
+  font-size: 1rem;
+}
+
+/* Explorer — full-width file list / file view */
+.explorer-file-list,
+.explorer-file-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.explorer-list-scroll {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.explorer-file-scroll {
+  flex: 1;
+  overflow: auto;
+  padding: 1rem;
+}
+
+.explorer-file-scroll pre {
+  margin: 0;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.explorer-file-scroll code {
+  font-family: ui-monospace, monospace;
+  font-size: 1rem;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 2px solid #000;
+  flex-shrink: 0;
+  min-height: 44px;
+}
+
+.panel-header-title {
+  font-size: var(--text-h2);
+  font-weight: bold;
+  font-variant: small-caps;
+  letter-spacing: 0.05em;
+}
+
+.panel-empty {
+  padding: 1rem;
+  font-size: 1rem;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-size: 1rem;
+  font-family: ui-monospace, monospace;
+  background: #fff;
+  color: #000;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.file-item[aria-selected="true"] {
+  font-weight: bold;
+  border-left: 2px solid #000;
+  padding-left: calc(0.75rem - 2px);
+}
+
+.file-item:focus {
+  outline: 2px solid #000;
+  outline-offset: -2px;
+}
+
+.file-item:active {
+  background: #000;
+  color: #fff;
+}
+
+.file-status-indicator {
+  font-weight: bold;
+  width: 1.25rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.file-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Diff view — syntax-highlighted lines with gutter indicators */
+.diff-view {
+  margin: 0;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.diff-line {
+  display: flex;
+  min-height: 1.5em;
+}
+
+.diff-lineno {
+  width: 3.5ch;
+  flex-shrink: 0;
+  text-align: right;
+  padding-right: 0.5ch;
+  opacity: 0.4;
+  user-select: none;
+}
+
+.diff-indicator {
+  width: 2ch;
+  flex-shrink: 0;
+  text-align: center;
+  font-weight: bold;
+  user-select: none;
+  border-right: 2px solid #000;
+  margin-right: 1ch;
+}
+
+.diff-line--add .diff-lineno,
+.diff-line--add .diff-indicator,
+.diff-line--remove .diff-lineno,
+.diff-line--remove .diff-indicator {
+  background: #000;
+  color: #fff;
+  opacity: 1;
+}
+
+/* Breadcrumb navigation */
+.breadcrumb {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+  overflow: hidden;
+  min-width: 0;
+  font-size: var(--text-body);
+  font-weight: bold;
+}
+
+.breadcrumb-btn {
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0 0.125rem;
+  color: #000;
+}
+
+.breadcrumb-btn:focus {
+  outline: 2px solid #000;
+  outline-offset: 2px;
+}
+
+.breadcrumb-btn:active {
+  background: #000;
+  color: #fff;
+}
+
 /* Single column on narrow screens */
 @media (max-width: 600px) {
   .layout {
@@ -632,4 +871,5 @@ body {
     max-height: 40vh;
     flex-shrink: 0;
   }
+
 }
