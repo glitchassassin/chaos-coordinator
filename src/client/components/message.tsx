@@ -8,6 +8,26 @@ interface Props {
   showRole?: boolean;
 }
 
+function ThinkingBlock({ text, i }: { text: string; i: number }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div key={i} class="thinking-block">
+      <button
+        class="thinking-toggle"
+        onClick={() => setExpanded((e) => !e)}
+      >
+        <em>Thinking... ({expanded ? "collapse" : "expand"})</em>
+      </button>
+      {expanded && (
+        <div class="thinking-content">
+          {text}
+          <hr class="thinking-hr" />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ToolPartView({ part, i }: { part: ToolPart; i: number }) {
   const [expanded, setExpanded] = useState(false);
   const { tool, state } = part;
@@ -77,11 +97,7 @@ function renderPart(part: Part, i: number, role: string) {
       return <ToolPartView part={part as ToolPart} i={i} />;
     case "reasoning":
       if (!("text" in part) || !part.text) return null;
-      return (
-        <div key={i} class="message-content" style={{ fontStyle: "italic" }}>
-          {part.text as string}
-        </div>
-      );
+      return <ThinkingBlock key={i} text={part.text as string} i={i} />;
     default:
       // Skip internal part types (step-start, step-finish, snapshot, etc.)
       return null;
