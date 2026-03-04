@@ -46,7 +46,6 @@ export function InstanceList({ instances, selected, onSelect, onNew, onRemove }:
             onClick={() => onSelect(inst.id)}
           >
             {inst.name}
-            <span class="sidebar-item-sub">:{inst.port}</span>
           </button>
           <RemoveButton onRemove={() => onRemove(inst.id)} label={`Remove ${inst.name}`} />
         </div>
