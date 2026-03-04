@@ -302,6 +302,7 @@ export function App() {
   const selectedName =
     instances.find((i) => i.id === selectedInstance)?.name || "";
 
+  const hasActivity = unreadSessions.size > 0 || pendingPermissions.size > 0;
   const unreadSessionIds = new Set(unreadSessions.keys());
   const unreadInstanceIds = new Set(unreadSessions.values());
   const pendingSessionIds = new Set([...pendingPermissions.values()].map((v) => v.sessionId));
@@ -349,6 +350,7 @@ export function App() {
               aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
             >
               ☰
+              {hasActivity && <span class="activity-bubble" aria-hidden="true" />}
             </button>
             <h1 class="topbar-title">
               {selectedInstance && selectedSession

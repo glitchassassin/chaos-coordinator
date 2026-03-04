@@ -154,6 +154,18 @@ body {
 .sidebar-toggle {
   font-size: 1.25rem;
   padding: 0.25rem 0.5rem;
+  position: relative;
+}
+
+.activity-bubble {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  pointer-events: none;
 }
 
 /* Buttons */
