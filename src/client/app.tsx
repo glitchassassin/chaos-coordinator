@@ -354,7 +354,7 @@ export function App() {
               aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
             >
               ☰
-              {hasActivity && <span class="activity-bubble" aria-hidden="true" />}
+              {hasActivity && <span class="activity-bubble" aria-hidden="true">*</span>}
             </button>
             <h1 class="topbar-title">
               {selectedInstance && selectedSession
