@@ -139,6 +139,20 @@ export function App() {
     }
   }, [loadInstances]);
 
+  const handleDeleteSession = useCallback(async (id: string) => {
+    if (!selectedInstance) return;
+    try {
+      await fetch(apiUrl(selectedInstance, `/session/${id}`), { method: "DELETE" });
+      if (selectedSession === id) {
+        setSelectedSession(null);
+        setMessages([]);
+      }
+      setSessions((prev) => prev.filter((s) => s.id !== id));
+    } catch (e) {
+      console.error("Failed to delete session:", e);
+    }
+  }, [selectedInstance, selectedSession]);
+
   const handleRemoveInstance = useCallback(async (id: string) => {
     try {
       await fetch(`/api/instances/${id}`, { method: "DELETE" });
@@ -171,6 +185,7 @@ export function App() {
               selected={selectedSession}
               onSelect={setSelectedSession}
               onCreate={handleCreateSession}
+              onDelete={handleDeleteSession}
               loading={sessionsLoading}
             />
           )}

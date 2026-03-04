@@ -1,4 +1,4 @@
-import { useState } from "preact/hooks";
+import { useDoubleCheck } from "../hooks/use-double-check.js";
 
 interface Instance {
   id: string;
@@ -15,25 +15,20 @@ interface Props {
   onRemove: (id: string) => void;
 }
 
+function RemoveButton({ onRemove, label }: { onRemove: () => void; label: string }) {
+  const { pending, getButtonProps } = useDoubleCheck();
+  return (
+    <button
+      class={`sidebar-item-remove${pending ? " sidebar-item-remove--confirm" : ""}`}
+      aria-label={label}
+      {...getButtonProps({ onClick: pending ? onRemove : undefined })}
+    >
+      {pending ? "Confirm?" : "×"}
+    </button>
+  );
+}
+
 export function InstanceList({ instances, selected, onSelect, onNew, onRemove }: Props) {
-  const [confirming, setConfirming] = useState<string | null>(null);
-
-  function handleRemoveClick(e: MouseEvent, id: string) {
-    e.stopPropagation();
-    setConfirming(id);
-  }
-
-  function handleConfirmYes(e: MouseEvent, id: string) {
-    e.stopPropagation();
-    setConfirming(null);
-    onRemove(id);
-  }
-
-  function handleConfirmNo(e: MouseEvent) {
-    e.stopPropagation();
-    setConfirming(null);
-  }
-
   return (
     <nav class="sidebar-section">
       <div class="sidebar-header-row">
@@ -53,21 +48,7 @@ export function InstanceList({ instances, selected, onSelect, onNew, onRemove }:
             {inst.name}
             <span class="sidebar-item-sub">:{inst.port}</span>
           </button>
-          {confirming === inst.id ? (
-            <span class="sidebar-item-confirm">
-              <button class="btn btn--small btn--danger" onClick={(e) => handleConfirmYes(e, inst.id)}>Yes</button>
-              <button class="btn btn--small" onClick={handleConfirmNo}>No</button>
-            </span>
-          ) : (
-            <button
-              class="sidebar-item-remove"
-              onClick={(e) => handleRemoveClick(e, inst.id)}
-              aria-label={`Remove ${inst.name}`}
-              title="Remove instance"
-            >
-              ×
-            </button>
-          )}
+          <RemoveButton onRemove={() => onRemove(inst.id)} label={`Remove ${inst.name}`} />
         </div>
       ))}
     </nav>

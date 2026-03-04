@@ -514,12 +514,13 @@ body {
   justify-content: center;
 }
 
-.sidebar-item-confirm {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0 0.25rem;
-  flex-shrink: 0;
+.sidebar-item-remove--confirm {
+  font-size: 1rem;
+  font-weight: bold;
+  padding: 0 0.5rem;
+  background: #000;
+  color: #fff;
+  border: 2px solid #000;
 }
 
 /* Directory picker */
