@@ -159,8 +159,8 @@ body {
 
 .activity-bubble {
   position: absolute;
-  top: 2px;
-  right: 2px;
+  top: 10px;
+  right: 10px;
   width: 10px;
   height: 10px;
   border-radius: 50%;
