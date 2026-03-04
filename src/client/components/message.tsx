@@ -12,6 +12,7 @@ import go from "highlight.js/lib/languages/go";
 import yaml from "highlight.js/lib/languages/yaml";
 import sql from "highlight.js/lib/languages/sql";
 import diff from "highlight.js/lib/languages/diff";
+import { useState } from "preact/hooks";
 import type { Part, ToolPart } from "../types.js";
 
 hljs.registerLanguage("javascript", javascript);
@@ -55,7 +56,8 @@ interface Props {
   showRole?: boolean;
 }
 
-function renderToolPart(part: ToolPart, i: number) {
+function ToolPartView({ part, i }: { part: ToolPart; i: number }) {
+  const [expanded, setExpanded] = useState(false);
   const { tool, state } = part;
   const status = state.status;
   const title = ("title" in state && state.title) || tool;
@@ -68,17 +70,34 @@ function renderToolPart(part: ToolPart, i: number) {
           ? `${title} (error)`
           : title;
 
+  const output =
+    status === "completed" && "output" in state && state.output
+      ? state.output
+      : null;
+  const truncatable = output !== null && output.length > 500;
+  const displayOutput = output
+    ? `\n${!expanded && truncatable ? output.slice(0, 500) + "..." : output}`
+    : "";
+
   return (
     <div key={i} class="message-content">
-      <pre>
-        <code>
-          [{label}]
-          {status === "completed" && "output" in state && state.output
-            ? `\n${state.output.length > 500 ? state.output.slice(0, 500) + "..." : state.output}`
-            : ""}
-          {status === "error" && "error" in state ? `\n${state.error}` : ""}
-        </code>
-      </pre>
+      <div class="tool-output-wrapper">
+        {truncatable && (
+          <button
+            class="tool-output-toggle"
+            onClick={() => setExpanded((e) => !e)}
+          >
+            {expanded ? "Show less" : "Show all"}
+          </button>
+        )}
+        <pre>
+          <code>
+            [{label}]
+            {displayOutput}
+            {status === "error" && "error" in state ? `\n${state.error}` : ""}
+          </code>
+        </pre>
+      </div>
     </div>
   );
 }
@@ -103,7 +122,7 @@ function renderPart(part: Part, i: number, role: string) {
         </div>
       );
     case "tool":
-      return renderToolPart(part as ToolPart, i);
+      return <ToolPartView part={part as ToolPart} i={i} />;
     case "reasoning":
       if (!("text" in part) || !part.text) return null;
       return (
