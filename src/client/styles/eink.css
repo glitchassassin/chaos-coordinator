@@ -173,6 +173,16 @@ body {
   justify-content: center;
 }
 
+.btn-stop {
+  padding: 0;
+  aspect-ratio: 1;
+}
+
+.btn-stop:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
 /* Chat area */
 .chat {
   flex: 1;

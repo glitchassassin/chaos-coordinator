@@ -145,7 +145,6 @@ export function App() {
         body: JSON.stringify({}),
       });
       const session: Session = await res.json();
-      setSessions((prev) => [...prev, session]);
       setSelectedSession(session.id);
     } catch (e) {
       console.error("Failed to create session:", e);

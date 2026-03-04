@@ -49,6 +49,9 @@ export function Chat({ instanceId, sessionId, initialMessages, onSend }: Props) 
       if (evt.type === "message.updated") {
         const info = props.info as MessageInfo;
         if (info.sessionID !== sessionId) return;
+        if (info.role === "assistant" && info.time.completed) {
+          setSending(false);
+        }
         setMessages((prev) => {
           const idx = prev.findIndex((m) => m.info.id === info.id);
           if (idx >= 0) {
@@ -188,10 +191,14 @@ export function Chat({ instanceId, sessionId, initialMessages, onSend }: Props) 
 
     try {
       await onSend(text);
-    } finally {
+    } catch {
       setSending(false);
     }
   };
+
+  const handleStop = useCallback(async () => {
+    await fetch(instanceUrl(instanceId, `/session/${sessionId}/abort`), { method: "POST" });
+  }, [instanceId, sessionId]);
 
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -225,6 +232,17 @@ export function Chat({ instanceId, sessionId, initialMessages, onSend }: Props) 
           disabled={sending}
           rows={2}
         />
+        <button
+          type="button"
+          class="btn btn-stop"
+          disabled={!sending}
+          onClick={handleStop}
+          aria-label="Stop"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
+            <rect width="14" height="14" />
+          </svg>
+        </button>
         <button type="submit" class="btn btn-primary" disabled={sending}>
           Send
         </button>
