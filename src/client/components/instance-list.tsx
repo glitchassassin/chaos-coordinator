@@ -14,6 +14,7 @@ interface Props {
   onNew: () => void;
   onRemove: (id: string) => void;
   unreadIds: Set<string>;
+  pendingIds: Set<string>;
 }
 
 function RemoveButton({ onRemove, label }: { onRemove: () => void; label: string }) {
@@ -29,7 +30,7 @@ function RemoveButton({ onRemove, label }: { onRemove: () => void; label: string
   );
 }
 
-export function InstanceList({ instances, selected, onSelect, onNew, onRemove, unreadIds }: Props) {
+export function InstanceList({ instances, selected, onSelect, onNew, onRemove, unreadIds, pendingIds }: Props) {
   return (
     <nav class="sidebar-section">
       <div class="sidebar-header-row">
@@ -46,7 +47,7 @@ export function InstanceList({ instances, selected, onSelect, onNew, onRemove, u
             aria-selected={inst.id === selected}
             onClick={() => onSelect(inst.id)}
           >
-            {inst.name}{unreadIds.has(inst.id) ? " *" : ""}
+            {inst.name}{pendingIds.has(inst.id) ? " (?)" : unreadIds.has(inst.id) ? " *" : ""}
           </button>
           <RemoveButton onRemove={() => onRemove(inst.id)} label={`Remove ${inst.name}`} />
         </div>

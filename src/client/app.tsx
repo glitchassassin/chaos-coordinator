@@ -27,6 +27,8 @@ export function App() {
   const [view, setView] = useState<View>("main");
   // sessionId -> instanceId for unread tracking (default: all read on open)
   const [unreadSessions, setUnreadSessions] = useState<Map<string, string>>(() => new Map());
+  // requestId -> { sessionId, instanceId } for pending permission tracking
+  const [pendingPermissions, setPendingPermissions] = useState<Map<string, { sessionId: string; instanceId: string }>>(() => new Map());
 
   const selectedSessionRef = useRef<string | null>(selectedSession);
   const selectedInstanceRef = useRef<string | null>(selectedInstance);
@@ -86,6 +88,10 @@ export function App() {
     if (!selectedInstance) {
       setSessions([]);
       setSelectedSession(null);
+      setPendingPermissions((prev) => {
+        if (prev.size === 0) return prev;
+        return new Map();
+      });
       return;
     }
 
@@ -105,6 +111,25 @@ export function App() {
       })
       .catch(console.error)
       .finally(() => setSessionsLoading(false));
+
+    // Fetch pending permissions for this instance
+    const instanceId = selectedInstance;
+    fetch(apiUrl(instanceId, "/permission"))
+      .then((r) => (r.ok ? r.json() : []))
+      .then((all: Array<{ id: string; sessionID: string }>) => {
+        setPendingPermissions((prev) => {
+          const next = new Map(prev);
+          // Replace all entries for this instance with fresh data
+          for (const [k, v] of next) {
+            if (v.instanceId === instanceId) next.delete(k);
+          }
+          for (const p of all) {
+            next.set(p.id, { sessionId: p.sessionID, instanceId });
+          }
+          return next;
+        });
+      })
+      .catch(() => {});
   }, [selectedInstance]);
 
   // Listen for session updates via SSE
@@ -141,6 +166,31 @@ export function App() {
             if (!prev.has(info.id)) return prev;
             const next = new Map(prev);
             next.delete(info.id);
+            return next;
+          });
+        }
+      }
+
+      if (evt.type === "permission.asked" && selectedInstanceRef.current) {
+        const perm = evt.properties as unknown as { id: string; sessionID: string };
+        if (perm.id && perm.sessionID) {
+          const instanceId = selectedInstanceRef.current;
+          setPendingPermissions((prev) => {
+            if (prev.has(perm.id)) return prev;
+            const next = new Map(prev);
+            next.set(perm.id, { sessionId: perm.sessionID, instanceId });
+            return next;
+          });
+        }
+      }
+
+      if (evt.type === "permission.replied") {
+        const { requestID } = evt.properties as { requestID: string };
+        if (requestID) {
+          setPendingPermissions((prev) => {
+            if (!prev.has(requestID)) return prev;
+            const next = new Map(prev);
+            next.delete(requestID);
             return next;
           });
         }
@@ -254,6 +304,8 @@ export function App() {
 
   const unreadSessionIds = new Set(unreadSessions.keys());
   const unreadInstanceIds = new Set(unreadSessions.values());
+  const pendingSessionIds = new Set([...pendingPermissions.values()].map((v) => v.sessionId));
+  const pendingInstanceIds = new Set([...pendingPermissions.values()].map((v) => v.instanceId));
 
   const sortedSessions = [...sessions].sort((a, b) => {
     const aTime = a.time?.updated ?? a.time?.created ?? 0;
@@ -272,6 +324,7 @@ export function App() {
             onNew={handleNewInstance}
             onRemove={handleRemoveInstance}
             unreadIds={unreadInstanceIds}
+            pendingIds={pendingInstanceIds}
           />
           {selectedInstance && (
             <SessionList
@@ -282,6 +335,7 @@ export function App() {
               onDelete={handleDeleteSession}
               loading={sessionsLoading}
               unreadIds={unreadSessionIds}
+              pendingIds={pendingSessionIds}
             />
           )}
         </aside>
