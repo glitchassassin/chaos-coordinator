@@ -36,6 +36,8 @@ export function App() {
 
   const selectedSessionRef = useRef<string | null>(selectedSession);
   const selectedInstanceRef = useRef<string | null>(selectedInstance);
+  const sessionRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const messageRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => { selectedSessionRef.current = selectedSession; }, [selectedSession]);
   useEffect(() => { selectedInstanceRef.current = selectedInstance; }, [selectedInstance]);
 
@@ -100,22 +102,47 @@ export function App() {
       return;
     }
 
+    if (sessionRetryRef.current) {
+      clearTimeout(sessionRetryRef.current);
+      sessionRetryRef.current = null;
+    }
+
     setSessionsLoading(true);
 
-    fetch(apiUrl(selectedInstance, "/session"))
-      .then((r) => r.json())
-      .then((data) => {
-        const list: Session[] = Array.isArray(data)
-          ? data
-          : Object.values(data || {});
-        setSessions(list);
-        // If restored session no longer exists, clear it
-        setSelectedSession((prev) =>
-          prev && list.some((s) => s.id === prev) ? prev : null
-        );
-      })
-      .catch(console.error)
-      .finally(() => setSessionsLoading(false));
+    let cancelled = false;
+    let retries = 0;
+    const maxRetries = 15;
+
+    const fetchSessions = () => {
+      fetch(apiUrl(selectedInstance, "/session"))
+        .then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        })
+        .then((data) => {
+          if (cancelled) return;
+          const list: Session[] = Array.isArray(data)
+            ? data
+            : Object.values(data || {});
+          setSessions(list);
+          setSelectedSession((prev) =>
+            prev && list.some((s) => s.id === prev) ? prev : null
+          );
+          setSessionsLoading(false);
+        })
+        .catch((e) => {
+          if (cancelled) return;
+          if (retries < maxRetries) {
+            retries++;
+            sessionRetryRef.current = setTimeout(fetchSessions, 2000);
+          } else {
+            console.error("Failed to load sessions after retries:", e);
+            setSessionsLoading(false);
+          }
+        });
+    };
+
+    fetchSessions();
 
     // Fetch pending permissions for this instance
     const instanceId = selectedInstance;
@@ -135,6 +162,14 @@ export function App() {
         });
       })
       .catch(() => {});
+
+    return () => {
+      cancelled = true;
+      if (sessionRetryRef.current) {
+        clearTimeout(sessionRetryRef.current);
+        sessionRetryRef.current = null;
+      }
+    };
   }, [selectedInstance]);
 
   // Listen for session updates via SSE for all instances
@@ -217,13 +252,46 @@ export function App() {
       return;
     }
 
-    fetch(apiUrl(selectedInstance, `/session/${selectedSession}/message`))
-      .then((r) => r.json())
-      .then((data: MessageWithParts[]) => {
-        const list = Array.isArray(data) ? data : Object.values(data || {});
-        setMessages(list);
-      })
-      .catch(console.error);
+    if (messageRetryRef.current) {
+      clearTimeout(messageRetryRef.current);
+      messageRetryRef.current = null;
+    }
+
+    let cancelled = false;
+    let retries = 0;
+    const maxRetries = 15;
+
+    const fetchMessages = () => {
+      fetch(apiUrl(selectedInstance, `/session/${selectedSession}/message`))
+        .then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        })
+        .then((data: MessageWithParts[]) => {
+          if (cancelled) return;
+          const list = Array.isArray(data) ? data : Object.values(data || {});
+          setMessages(list);
+        })
+        .catch((e) => {
+          if (cancelled) return;
+          if (retries < maxRetries) {
+            retries++;
+            messageRetryRef.current = setTimeout(fetchMessages, 2000);
+          } else {
+            console.error("Failed to load messages after retries:", e);
+          }
+        });
+    };
+
+    fetchMessages();
+
+    return () => {
+      cancelled = true;
+      if (messageRetryRef.current) {
+        clearTimeout(messageRetryRef.current);
+        messageRetryRef.current = null;
+      }
+    };
   }, [selectedInstance, selectedSession]);
 
   const handleCreateSession = useCallback(async () => {
