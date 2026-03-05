@@ -52,9 +52,14 @@ export function SessionList({
 }: Props) {
   return (
     <nav class="sidebar-section" style={{ flex: 1, overflow: "auto" }}>
-      <div class="sidebar-header-row">
+      <div class="sidebar-section-header">
+        <span class="sidebar-section-icon" aria-hidden="true">
+          {/* mdi:message */}
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+            <path d="M20,2H4A2,2 0 0,0 2,4V22L6,18H20A2,2 0 0,0 22,16V4A2,2 0 0,0 20,2Z" />
+          </svg>
+        </span>
         <h2 class="sidebar-header">Sessions</h2>
-        <button class="btn btn--small" onClick={onCreate} title="New session">+</button>
       </div>
       {loading && <div class="loading">Loading...</div>}
       {!loading && sessions.length === 0 && (
@@ -72,6 +77,7 @@ export function SessionList({
           <DeleteButton onDelete={() => onDelete(s.id)} label={`Delete session ${s.title || s.id.slice(0, 12)}`} />
         </div>
       ))}
+      <button class="sidebar-item sidebar-item--add" onClick={onCreate}>+ Add Session</button>
     </nav>
   );
 }

@@ -115,16 +115,37 @@ body {
 .sidebar-section {
 }
 
-.sidebar-section + .sidebar-section {
-  margin-top: 1.5rem;
+.sidebar-section--expanded {
+  margin-bottom: 1.5rem;
+}
+
+
+.sidebar-section-header {
+  display: flex;
+  align-items: center;
+}
+
+.sidebar-section-header .btn-icon,
+.sidebar-section-icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .sidebar-header {
   font-size: var(--text-h2);
   font-weight: bold;
   font-variant: small-caps;
-  padding: 0.5rem 0.75rem;
+  padding: 0.5rem 0.75rem 0.5rem 0;
   letter-spacing: 0.05em;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebar-item {
@@ -138,6 +159,11 @@ body {
   text-align: left;
   cursor: pointer;
   min-height: 44px;
+}
+
+.sidebar-item--add {
+  font-style: italic;
+  opacity: 0.6;
 }
 
 .sidebar-item[aria-selected="true"] {
@@ -705,18 +731,6 @@ code[class*="language-"] {
 .loading {
   padding: 0.75rem;
   font-size: var(--text-caption);
-}
-
-/* Instance list header row with + New button */
-.sidebar-header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-right: 0.5rem;
-}
-
-.sidebar-header-row .sidebar-header {
-  flex: 1;
 }
 
 .btn--small {

@@ -1,3 +1,4 @@
+import { useState } from "preact/hooks";
 import { useDoubleCheck } from "../hooks/use-double-check.js";
 
 function GitHubIcon() {
@@ -58,27 +59,40 @@ function RemoveButton({ onRemove, label }: { onRemove: () => void; label: string
 }
 
 export function InstanceList({ instances, selected, onSelect, onNew, onRemove, unreadIds, pendingIds }: Props) {
+  const [collapsed, setCollapsed] = useState(!!selected);
+  const selectedInst = instances.find((i) => i.id === selected);
+
   return (
-    <nav class="sidebar-section">
-      <div class="sidebar-header-row">
-        <h2 class="sidebar-header">Instances</h2>
-        <button class="btn btn--small" onClick={onNew} title="New instance">+</button>
+    <nav class={`sidebar-section${collapsed ? "" : " sidebar-section--expanded"}`}>
+      <div class="sidebar-section-header">
+        <button class="btn btn-icon" onClick={() => setCollapsed((c) => !c)} aria-label={collapsed ? "Expand instances" : "Collapse instances"}>
+          {/* mdi:folder */}
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" width="20" height="20">
+            <path d="M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6H12L10,4Z" />
+          </svg>
+        </button>
+        <h2 class="sidebar-header">{collapsed ? (selectedInst?.name ?? "Instances") : "Instances"}</h2>
       </div>
-      {instances.length === 0 && (
-        <div class="loading">No instances configured</div>
+      {!collapsed && (
+        <>
+          {instances.length === 0 && (
+            <div class="loading">No instances configured</div>
+          )}
+          {instances.map((inst) => (
+            <div key={inst.id} class="sidebar-item-row">
+              <button
+                class="sidebar-item"
+                aria-selected={inst.id === selected}
+                onClick={() => onSelect(inst.id)}
+              >
+                {inst.remote === "github" && <GitHubIcon />}{inst.remote === "azuredevops" && <AzureDevOpsIcon />}{inst.name}{pendingIds.has(inst.id) ? " (?)" : unreadIds.has(inst.id) ? " *" : ""}
+              </button>
+              <RemoveButton onRemove={() => onRemove(inst.id)} label={`Remove ${inst.name}`} />
+            </div>
+          ))}
+          <button class="sidebar-item sidebar-item--add" onClick={onNew}>+ Add Instance…</button>
+        </>
       )}
-      {instances.map((inst) => (
-        <div key={inst.id} class="sidebar-item-row">
-          <button
-            class="sidebar-item"
-            aria-selected={inst.id === selected}
-            onClick={() => onSelect(inst.id)}
-          >
-            {inst.remote === "github" && <GitHubIcon />}{inst.remote === "azuredevops" && <AzureDevOpsIcon />}{inst.name}{pendingIds.has(inst.id) ? " (?)" : unreadIds.has(inst.id) ? " *" : ""}
-          </button>
-          <RemoveButton onRemove={() => onRemove(inst.id)} label={`Remove ${inst.name}`} />
-        </div>
-      ))}
     </nav>
   );
 }
