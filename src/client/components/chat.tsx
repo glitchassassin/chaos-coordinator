@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "preact/hooks";
 import { Message } from "./message.js";
 import { PermissionBanner } from "./permission-banner.js";
+import { QuestionBanner } from "./question-banner.js";
 import { instanceUrl } from "../hooks/use-api.js";
 import { useSSE } from "../hooks/use-sse.js";
-import type { MessageWithParts, Part, SSEEvent, MessageInfo, PermissionRequest } from "../types.js";
+import type { MessageWithParts, Part, SSEEvent, MessageInfo, PermissionRequest, QuestionRequest } from "../types.js";
 
 interface Props {
   instanceId: string;
@@ -17,6 +18,7 @@ export function Chat({ instanceId, sessionId, initialMessages, onSend }: Props) 
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [pendingPermissions, setPendingPermissions] = useState<PermissionRequest[]>([]);
+  const [pendingQuestions, setPendingQuestions] = useState<QuestionRequest[]>([]);
   const chatRef = useRef<HTMLDivElement>(null);
 
   // Sync when parent passes new initial messages (session switch)
@@ -32,6 +34,16 @@ export function Chat({ instanceId, sessionId, initialMessages, onSend }: Props) 
         setPendingPermissions(all.filter((p) => p.sessionID === sessionId));
       })
       .catch(() => setPendingPermissions([]));
+  }, [instanceId, sessionId]);
+
+  // Fetch pending questions on mount / session switch
+  useEffect(() => {
+    fetch(instanceUrl(instanceId, "/question"))
+      .then((res) => (res.ok ? res.json() : []))
+      .then((all: QuestionRequest[]) => {
+        setPendingQuestions(all.filter((q) => q.sessionID === sessionId));
+      })
+      .catch(() => setPendingQuestions([]));
   }, [instanceId, sessionId]);
 
   // Auto-scroll to bottom
@@ -131,6 +143,19 @@ export function Chat({ instanceId, sessionId, initialMessages, onSend }: Props) 
         const { requestID } = props as { sessionID: string; requestID: string };
         setPendingPermissions((prev) => prev.filter((p) => p.id !== requestID));
       }
+
+      if (evt.type === "question.asked") {
+        const req = props as unknown as QuestionRequest;
+        if (req.sessionID !== sessionId) return;
+        setPendingQuestions((prev) =>
+          prev.some((q) => q.id === req.id) ? prev : [...prev, req],
+        );
+      }
+
+      if (evt.type === "question.replied" || evt.type === "question.rejected") {
+        const { requestID } = props as { sessionID: string; requestID: string };
+        setPendingQuestions((prev) => prev.filter((q) => q.id !== requestID));
+      }
     },
     [sessionId],
   );
@@ -161,6 +186,41 @@ export function Chat({ instanceId, sessionId, initialMessages, onSend }: Props) 
       }
     },
     [instanceId, sessionId],
+  );
+
+  const replyQuestion = useCallback(
+    async (requestId: string, answers: string[][]) => {
+      setPendingQuestions((prev) => prev.filter((q) => q.id !== requestId));
+      try {
+        await fetch(instanceUrl(instanceId, `/question/${requestId}/reply`), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ answers }),
+        });
+      } catch {
+        fetch(instanceUrl(instanceId, "/question"))
+          .then((res) => (res.ok ? res.json() : []))
+          .then((all: QuestionRequest[]) => {
+            setPendingQuestions(all.filter((q) => q.sessionID === sessionId));
+          })
+          .catch(() => {});
+      }
+    },
+    [instanceId, sessionId],
+  );
+
+  const rejectQuestion = useCallback(
+    async (requestId: string) => {
+      setPendingQuestions((prev) => prev.filter((q) => q.id !== requestId));
+      try {
+        await fetch(instanceUrl(instanceId, `/question/${requestId}/reject`), {
+          method: "POST",
+        });
+      } catch {
+        // best-effort; SSE will update state if needed
+      }
+    },
+    [instanceId],
   );
 
   const handleSubmit = async () => {
@@ -221,6 +281,7 @@ export function Chat({ instanceId, sessionId, initialMessages, onSend }: Props) 
             showRole={i === 0 || messages[i - 1].info.role !== m.info.role}
           />
         ))}
+        <QuestionBanner questions={pendingQuestions} onReply={replyQuestion} onReject={rejectQuestion} />
       </div>
       <PermissionBanner permissions={pendingPermissions} onReply={replyPermission} />
       <form class="input-area" onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
@@ -234,17 +295,19 @@ export function Chat({ instanceId, sessionId, initialMessages, onSend }: Props) 
         />
         <button
           type="button"
-          class="btn btn-stop"
+          class="btn btn-icon"
           disabled={!sending}
           onClick={handleStop}
           aria-label="Stop"
         >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
-            <rect width="14" height="14" />
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M9,9H15V15H9" />
           </svg>
         </button>
-        <button type="submit" class="btn btn-primary" disabled={sending}>
-          Send
+        <button type="submit" class="btn btn-icon" disabled={sending} aria-label="Send">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M15,20H9V12H4.16L12,4.16L19.84,12H15V20Z" />
+          </svg>
         </button>
       </form>
     </div>
