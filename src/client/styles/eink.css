@@ -260,32 +260,37 @@ body {
   white-space: normal;
 }
 
-.tool-output-wrapper {
-  position: relative;
+.tool-block {
+  margin: 0.5rem 0;
 }
 
-.tool-output-toggle {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  z-index: 1;
-  background: #000;
-  color: #fff;
-  border: 2px solid #000;
-  font-size: 1rem;
-  font-family: ui-monospace, monospace;
-  padding: 0.1rem 0.4rem;
+.tool-toggle {
+  background: none;
+  border: none;
+  padding: 0;
   cursor: pointer;
+  font-size: 1rem;
+  font-family: inherit;
 }
 
-.tool-output-toggle:focus {
+.tool-toggle:focus {
   outline: 2px solid #000;
   outline-offset: 2px;
 }
 
-.tool-output-toggle:active {
-  background: #fff;
-  color: #000;
+.tool-toggle:active em {
+  text-decoration: underline;
+}
+
+.tool-content {
+  margin-left: 1.5rem;
+  margin-top: 0.5rem;
+}
+
+.tool-section-label {
+  font-size: 1rem;
+  font-style: italic;
+  margin-top: 0.5rem;
 }
 
 .thinking-block {
@@ -325,14 +330,16 @@ body {
   margin: 0.5rem -1.5rem 0 -1.5rem;
 }
 
-.message-content pre {
-  border: 2px solid #000;
+.message-content pre,
+.tool-content pre {
+  border-left: 2px solid rgba(0, 0, 0, 0.5);
   padding: 0.5rem;
   overflow-x: auto;
   margin: 0.5rem 0;
 }
 
-.message-content code {
+.message-content code,
+.tool-content code {
   font-family: ui-monospace, monospace;
   font-size: 1rem;
 }

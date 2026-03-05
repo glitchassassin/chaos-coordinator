@@ -32,44 +32,52 @@ function ToolPartView({ part, i }: { part: ToolPart; i: number }) {
   const [expanded, setExpanded] = useState(false);
   const { tool, state } = part;
   const status = state.status;
-  const title = ("title" in state && state.title) || tool;
-  const label =
+  const title = state.title || tool;
+  const statusSuffix =
     status === "pending"
-      ? `${title} ...`
+      ? " ..."
       : status === "running"
-        ? `${title} (running)`
+        ? " (running)"
         : status === "error"
-          ? `${title} (error)`
-          : title;
-
-  const output =
-    status === "completed" && "output" in state && state.output
-      ? state.output
-      : null;
-  const truncatable = output !== null && output.length > 500;
-  const displayOutput = output
-    ? `\n${!expanded && truncatable ? output.slice(0, 500) + "..." : output}`
-    : "";
+          ? " (error)"
+          : "";
 
   return (
-    <div key={i} class="message-content">
-      <div class="tool-output-wrapper">
-        {truncatable && (
-          <button
-            class="tool-output-toggle"
-            onClick={() => setExpanded((e) => !e)}
-          >
-            {expanded ? "Show less" : "Show all"}
-          </button>
-        )}
-        <pre>
-          <code>
-            [{label}]
-            {displayOutput}
-            {status === "error" && "error" in state ? `\n${state.error}` : ""}
-          </code>
-        </pre>
-      </div>
+    <div key={i} class="tool-block">
+      <button class="tool-toggle" onClick={() => setExpanded((e) => !e)}>
+        <em>
+          {title}
+          {statusSuffix} ({expanded ? "collapse" : "expand"})
+        </em>
+      </button>
+      {expanded && (
+        <div class="tool-content">
+          {state.input && (
+            <>
+              <div class="tool-section-label">input</div>
+              <pre>
+                <code>{JSON.stringify(state.input, null, 2)}</code>
+              </pre>
+            </>
+          )}
+          {state.output && (
+            <>
+              <div class="tool-section-label">output</div>
+              <pre>
+                <code>{state.output}</code>
+              </pre>
+            </>
+          )}
+          {state.error && (
+            <>
+              <div class="tool-section-label">error</div>
+              <pre>
+                <code>{state.error}</code>
+              </pre>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
