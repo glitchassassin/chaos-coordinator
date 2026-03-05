@@ -36,7 +36,7 @@ function resolveLanguage(lang: string): string | null {
   return Prism.languages[resolved] ? resolved : null;
 }
 
-function escapeHtml(text: string): string {
+export function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -44,20 +44,12 @@ function escapeHtml(text: string): string {
     .replace(/"/g, "&quot;");
 }
 
-// highlight.js-compatible shim
-export const hljs = {
-  getLanguage(lang: string) {
-    return Prism.languages[resolveLanguage(lang) ?? ""] ?? null;
-  },
-  highlight(text: string, { language }: { language: string }) {
-    const resolved = resolveLanguage(language);
-    if (!resolved) return { value: escapeHtml(text) };
-    return { value: Prism.highlight(text, Prism.languages[resolved], resolved) };
-  },
-  highlightAuto(text: string) {
-    return { value: escapeHtml(text) };
-  },
-};
+/** Highlight text with Prism. Returns escaped plain text if language is unsupported. */
+export function highlight(text: string, language: string): string {
+  const resolved = resolveLanguage(language);
+  if (!resolved) return escapeHtml(text);
+  return Prism.highlight(text, Prism.languages[resolved], resolved);
+}
 
 marked.use({
   renderer: {

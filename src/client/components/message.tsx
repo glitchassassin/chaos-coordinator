@@ -1,4 +1,4 @@
-import { marked, hljs } from "../util/highlight.js";
+import { marked, highlight } from "../util/highlight.js";
 import { useState } from "preact/hooks";
 import type { Part, ToolPart } from "../types.js";
 
@@ -59,10 +59,10 @@ function ToolPartView({ part, i }: { part: ToolPart; i: number }) {
                 <code
                   class="language-json"
                   dangerouslySetInnerHTML={{
-                    __html: hljs.highlight(
+                    __html: highlight(
                       JSON.stringify(state.input, null, 2),
-                      { language: "json" },
-                    ).value,
+                      "json",
+                    ),
                   }}
                 />
               </pre>
@@ -75,9 +75,7 @@ function ToolPartView({ part, i }: { part: ToolPart; i: number }) {
                 <code
                   class="language-markdown"
                   dangerouslySetInnerHTML={{
-                    __html: hljs.highlight(state.output, {
-                      language: "markdown",
-                    }).value,
+                    __html: highlight(state.output, "markdown"),
                   }}
                 />
               </pre>

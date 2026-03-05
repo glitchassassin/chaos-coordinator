@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "preact/hooks";
-import { hljs, extensionToLanguage } from "../util/highlight.js";
+import { highlight, extensionToLanguage } from "../util/highlight.js";
 import { basename, dirname } from "../util/path.js";
 
 interface Props {
@@ -18,6 +18,7 @@ export function Explorer({ rootPath }: Props) {
   const [entries, setEntries] = useState<FsEntry[]>([]);
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [filePath, setFilePath] = useState<string | null>(null);
+  const [fileLang, setFileLang] = useState<string | null>(null);
   const [isBinary, setIsBinary] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -52,12 +53,8 @@ export function Explorer({ rootPath }: Props) {
               setIsBinary(true);
             } else {
               const lang = extensionToLanguage(entry.name);
-              const text = data.content || "";
-              if (lang && hljs.getLanguage(lang)) {
-                setFileContent(hljs.highlight(text, { language: lang }).value);
-              } else {
-                setFileContent(hljs.highlightAuto(text).value);
-              }
+              setFileLang(lang);
+              setFileContent(highlight(data.content || "", lang ?? ""));
             }
           })
           .catch(console.error);
@@ -69,6 +66,7 @@ export function Explorer({ rootPath }: Props) {
   const handleBack = useCallback(() => {
     setFilePath(null);
     setFileContent(null);
+    setFileLang(null);
     setIsBinary(false);
   }, []);
 
@@ -93,7 +91,7 @@ export function Explorer({ rootPath }: Props) {
           {isBinary ? (
             <div class="panel-empty">Binary file</div>
           ) : (
-            <pre class="diff-view"><code class="hljs">
+            <pre class="diff-view"><code class={`language-${fileLang ?? "plaintext"}`}>
               {fileContent!.split("\n").map((line, i) => (
                 <div key={i} class="diff-line">
                   <span class="diff-lineno">{i + 1}</span>

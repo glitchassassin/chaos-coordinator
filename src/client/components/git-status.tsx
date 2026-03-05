@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "preact/hooks";
-import { hljs, extensionToLanguage } from "../util/highlight.js";
+import { highlight, escapeHtml, extensionToLanguage } from "../util/highlight.js";
 import { instanceUrl } from "../hooks/use-api.js";
 import type { FileStatus, FileContent } from "../types.js";
 
@@ -59,11 +59,9 @@ function highlightLines(
   diffLines: DiffLine[],
   language: string | null,
 ): string[] {
-  const lang = language && hljs.getLanguage(language) ? language : null;
   return diffLines.map((line) => {
     if (!line.content) return "";
-    if (lang) return hljs.highlight(line.content, { language: lang }).value;
-    return hljs.highlightAuto(line.content).value;
+    return language ? highlight(line.content, language) : escapeHtml(line.content);
   });
 }
 
@@ -136,7 +134,7 @@ export function GitStatus({ instanceId }: Props) {
         </div>
         <div class="git-diff-scroll">
           <pre class="diff-view">
-            <code class="hljs">
+            <code class="language-plaintext">
               {diffLines.map((line, i) => (
                 <div key={i} class={`diff-line diff-line--${line.type}`}>
                   <span class="diff-lineno">{line.oldNo ?? ""}</span>

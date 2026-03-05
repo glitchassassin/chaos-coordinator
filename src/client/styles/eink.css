@@ -350,7 +350,6 @@ body {
    definitions matter. Comments are important — don't hide them.
    ─────────────────────────────────────────────────────────────────────── */
 
-.hljs,
 code[class*="language-"] {
   color: #000;
   background: transparent;
@@ -431,6 +430,12 @@ code[class*="language-"] {
 }
 .token.bold {
   font-weight: bold;
+}
+
+/* Titles (Markdown headings, YAML keys, etc.) — bold italic */
+.token.title {
+  font-weight: bold;
+  font-style: italic;
 }
 
 .message-content p {
