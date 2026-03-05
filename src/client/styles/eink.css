@@ -1,6 +1,25 @@
 /* E-ink optimized styles — no grays, no color, no transitions */
 
 :root {
+  /* Kaleido 3 color palette — use for solid fills (icons, button backgrounds) only.
+     Do NOT use for text or borders. */
+  --color-black:      #000000;
+  --color-dark-gray:  #404040;
+  --color-mid-gray:   #808080;
+  --color-light-gray: #c0c0c0;
+  --color-white:      #ffffff;
+  --color-red:        #ff6163;
+  --color-green:      #00b036;
+  --color-navy:       #000084;
+  --color-aqua:       #00f0ff;
+  --color-violet:     #ee00ff;
+  --color-orange:     #ffaa00;
+  --color-lemon:      #f0ff00;
+  --color-chartreuse: #008000;
+  --color-grape:      #9338be;
+  --color-sky:        #00aaff;
+  --color-orange-red: #ff4400;
+
   /* Typographic scale — printed matter / perfect fourth from 18px base */
   --text-masthead: 2.667rem; /* 48px */
   --text-h1: 1.778rem; /* 32px */
@@ -1002,10 +1021,15 @@ code[class*="language-"] {
 }
 
 .diff-line--add .diff-lineno,
-.diff-line--add .diff-indicator,
+.diff-line--add .diff-indicator {
+  background: var(--color-green);
+  color: #fff;
+  opacity: 1;
+}
+
 .diff-line--remove .diff-lineno,
 .diff-line--remove .diff-indicator {
-  background: #000;
+  background: var(--color-red);
   color: #fff;
   opacity: 1;
 }
