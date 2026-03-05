@@ -1049,6 +1049,28 @@ code[class*="language-"] {
   opacity: 1;
 }
 
+.diff-line--remove > span:last-child {
+  opacity: 0.5;
+}
+
+/* Top border: first changed line in a block */
+.diff-line--add:not(.diff-line--add + .diff-line--add):not(.diff-line--remove + .diff-line--add) {
+  border-top: 2px solid var(--color-green);
+}
+.diff-line--remove:not(.diff-line--add + .diff-line--remove):not(.diff-line--remove + .diff-line--remove) {
+  border-top: 2px solid var(--color-red);
+}
+
+/* Bottom border: last changed line in a block, or at a type transition within a block */
+.diff-line--add:not(:has(+ .diff-line--add)):not(:has(+ .diff-line--remove)),
+.diff-line--add:has(+ .diff-line--remove) {
+  border-bottom: 2px solid var(--color-green);
+}
+.diff-line--remove:not(:has(+ .diff-line--add)):not(:has(+ .diff-line--remove)),
+.diff-line--remove:has(+ .diff-line--add) {
+  border-bottom: 2px solid var(--color-red);
+}
+
 /* Breadcrumb navigation */
 .breadcrumb {
   display: flex;
