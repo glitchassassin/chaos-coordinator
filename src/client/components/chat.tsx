@@ -92,6 +92,7 @@ export function Chat({ instanceId, sessionId, initialMessages, onSend }: Props) 
               parts[idx] = part;
             } else {
               parts.push(part);
+              parts.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
             }
             return { ...m, parts };
           }),
