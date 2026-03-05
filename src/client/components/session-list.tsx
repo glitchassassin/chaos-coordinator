@@ -44,7 +44,7 @@ export function SessionList({
     <nav class="sidebar-section" style={{ flex: 1, overflow: "auto" }}>
       <div class="sidebar-header-row">
         <h2 class="sidebar-header">Sessions</h2>
-        <button class="btn btn--small" onClick={onCreate}>+ New</button>
+        <button class="btn btn--small" onClick={onCreate} title="New session">+</button>
       </div>
       {loading && <div class="loading">Loading...</div>}
       {!loading && sessions.length === 0 && (
