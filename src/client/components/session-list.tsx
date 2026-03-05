@@ -9,8 +9,7 @@ interface Session {
 interface Props {
   sessions: Session[];
   selected: string | null;
-  onSelect: (id: string) => void;
-  onCreate: () => void;
+  onSelect: (id: string | null) => void;
   onDelete: (id: string) => void;
   loading: boolean;
   unreadIds: Set<string>;
@@ -44,7 +43,6 @@ export function SessionList({
   sessions,
   selected,
   onSelect,
-  onCreate,
   onDelete,
   loading,
   unreadIds,
@@ -61,10 +59,15 @@ export function SessionList({
         </span>
         <h2 class="sidebar-header">Sessions</h2>
       </div>
+      <button
+        class="sidebar-item"
+        style={{ fontStyle: "italic" }}
+        aria-selected={selected === null}
+        onClick={() => onSelect(null)}
+      >
+        New Session
+      </button>
       {loading && <div class="loading">Loading...</div>}
-      {!loading && sessions.length === 0 && (
-        <div class="loading">No sessions</div>
-      )}
       {sessions.map((s) => (
         <div key={s.id} class="sidebar-item-row">
           <button
@@ -77,7 +80,6 @@ export function SessionList({
           <DeleteButton onDelete={() => onDelete(s.id)} label={`Delete session ${s.title || s.id.slice(0, 12)}`} />
         </div>
       ))}
-      <button class="sidebar-item sidebar-item--add" onClick={onCreate}>+ Add Session</button>
     </nav>
   );
 }

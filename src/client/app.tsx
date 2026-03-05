@@ -294,27 +294,23 @@ export function App() {
     };
   }, [selectedInstance, selectedSession]);
 
-  const handleCreateSession = useCallback(async () => {
-    if (!selectedInstance) return;
-    try {
-      const res = await fetch(apiUrl(selectedInstance, "/session"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      const session: Session = await res.json();
-      setSelectedSession(session.id);
-    } catch (e) {
-      console.error("Failed to create session:", e);
-    }
-  }, [selectedInstance]);
-
   // Fire-and-forget send — SSE delivers updates
   const handleSendMessage = useCallback(
     async (text: string) => {
-      if (!selectedInstance || !selectedSession) return;
+      if (!selectedInstance) return;
+      let sessionId = selectedSession;
+      if (!sessionId) {
+        const res = await fetch(apiUrl(selectedInstance, "/session"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+        const session: Session = await res.json();
+        setSelectedSession(session.id);
+        sessionId = session.id;
+      }
       await fetch(
-        apiUrl(selectedInstance, `/session/${selectedSession}/prompt_async`),
+        apiUrl(selectedInstance, `/session/${sessionId}/prompt_async`),
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -409,7 +405,6 @@ export function App() {
               sessions={sortedSessions}
               selected={selectedSession}
               onSelect={setSelectedSession}
-              onCreate={handleCreateSession}
               onDelete={handleDeleteSession}
               loading={sessionsLoading}
               unreadIds={unreadSessionIds}
@@ -438,7 +433,7 @@ export function App() {
                 : "Chaos Coordinator"}
             </h1>
           </div>
-          {selectedInstance && selectedSession && (
+          {selectedInstance && (
             <div class="topbar-center">
               <button
                 class="view-toggle-btn"
@@ -480,25 +475,19 @@ export function App() {
           <DirectoryPicker
             onSelect={handleInstanceSelect}
           />
-        ) : selectedInstance && selectedSession ? (
-          sessionView === "git" ? (
-            <GitStatus instanceId={selectedInstance} />
-          ) : sessionView === "explorer" ? (
-            <Explorer instanceId={selectedInstance} rootPath={instances.find((i) => i.id === selectedInstance)?.directory || "/"} />
-          ) : (
-            <Chat
-              instanceId={selectedInstance}
-              sessionId={selectedSession}
-              initialMessages={messages}
-              onSend={handleSendMessage}
-            />
-          )
+        ) : !selectedInstance ? (
+          <div class="empty-state">Select an instance to get started.</div>
+        ) : sessionView === "git" ? (
+          <GitStatus instanceId={selectedInstance} />
+        ) : sessionView === "explorer" ? (
+          <Explorer instanceId={selectedInstance} rootPath={instances.find((i) => i.id === selectedInstance)?.directory || "/"} />
         ) : (
-          <div class="empty-state">
-            {!selectedInstance
-              ? "Select an instance to get started."
-              : "Select or create a session."}
-          </div>
+          <Chat
+            instanceId={selectedInstance}
+            sessionId={selectedSession ?? ""}
+            initialMessages={selectedSession ? messages : []}
+            onSend={handleSendMessage}
+          />
         )}
       </main>
     </div>
