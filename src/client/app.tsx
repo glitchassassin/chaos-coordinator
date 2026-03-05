@@ -29,6 +29,8 @@ export function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [view, setView] = useState<View>("main");
   const [sessionView, setSessionView] = useState<SessionView>("chat");
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
   // sessionId -> instanceId for unread tracking (default: all read on open)
   const [unreadSessions, setUnreadSessions] = useState<Map<string, string>>(() => new Map());
   // requestId -> { sessionId, instanceId } for pending permission tracking
@@ -323,6 +325,31 @@ export function App() {
     [selectedInstance, selectedSession],
   );
 
+  const handleSubmit = useCallback(async () => {
+    const text = input.trim();
+    if (!text || sending || !selectedInstance) return;
+    setInput("");
+    setSending(true);
+    setSessionView("chat");
+    try {
+      await handleSendMessage(text);
+    } catch {
+      setSending(false);
+    }
+  }, [input, sending, selectedInstance, handleSendMessage]);
+
+  const handleStop = useCallback(async () => {
+    if (!selectedInstance || !selectedSession) return;
+    await fetch(apiUrl(selectedInstance, `/session/${selectedSession}/abort`), { method: "POST" });
+  }, [selectedInstance, selectedSession]);
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit();
+    }
+  }, [handleSubmit]);
+
   const handleNewInstance = useCallback(() => {
     setView("new-instance");
   }, []);
@@ -486,8 +513,36 @@ export function App() {
             instanceId={selectedInstance}
             sessionId={selectedSession ?? ""}
             initialMessages={selectedSession ? messages : []}
-            onSend={handleSendMessage}
+            setSending={setSending}
           />
+        )}
+        {selectedInstance && view !== "new-instance" && (
+          <form class="input-area" onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
+            <textarea
+              value={input}
+              onInput={(e) => setInput((e.target as HTMLTextAreaElement).value)}
+              onKeyDown={handleKeyDown}
+              placeholder={sending ? "Sending..." : "Type a message..."}
+              disabled={sending}
+              rows={2}
+            />
+            <button
+              type="button"
+              class="btn btn-icon"
+              disabled={!sending}
+              onClick={handleStop}
+              aria-label="Stop"
+            >
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M9,9H15V15H9" />
+              </svg>
+            </button>
+            <button type="submit" class="btn btn-icon" disabled={sending} aria-label="Send">
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M15,20H9V12H4.16L12,4.16L19.84,12H15V20Z" />
+              </svg>
+            </button>
+          </form>
         )}
       </main>
     </div>

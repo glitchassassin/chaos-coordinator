@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from "preact/hooks";
+import { instanceUrl } from "../hooks/use-api.js";
 import { Message } from "./message.js";
 import { PermissionBanner } from "./permission-banner.js";
 import { QuestionBanner } from "./question-banner.js";
-import { instanceUrl } from "../hooks/use-api.js";
 import { useSSE } from "../hooks/use-sse.js";
 import type { MessageWithParts, Part, SSEEvent, MessageInfo, PermissionRequest, QuestionRequest } from "../types.js";
 
@@ -10,13 +10,11 @@ interface Props {
   instanceId: string;
   sessionId: string;
   initialMessages: MessageWithParts[];
-  onSend: (text: string) => Promise<void>;
+  setSending: (v: boolean) => void;
 }
 
-export function Chat({ instanceId, sessionId, initialMessages, onSend }: Props) {
+export function Chat({ instanceId, sessionId, initialMessages, setSending }: Props) {
   const [messages, setMessages] = useState<MessageWithParts[]>(initialMessages);
-  const [input, setInput] = useState("");
-  const [sending, setSending] = useState(false);
   const [pendingPermissions, setPendingPermissions] = useState<PermissionRequest[]>([]);
   const [pendingQuestions, setPendingQuestions] = useState<QuestionRequest[]>([]);
   const chatRef = useRef<HTMLDivElement>(null);
@@ -224,50 +222,6 @@ export function Chat({ instanceId, sessionId, initialMessages, onSend }: Props) 
     [instanceId],
   );
 
-  const handleSubmit = async () => {
-    const text = input.trim();
-    if (!text || sending) return;
-    setInput("");
-    setSending(true);
-
-    // Optimistic add
-    const optimistic: MessageWithParts = {
-      info: {
-        id: `pending-${Date.now()}`,
-        sessionID: sessionId,
-        role: "user",
-        time: { created: Date.now() },
-      },
-      parts: [
-        {
-          id: `part-pending-${Date.now()}`,
-          sessionID: sessionId,
-          messageID: `pending-${Date.now()}`,
-          type: "text",
-          text,
-        },
-      ],
-    };
-    setMessages((prev) => [...prev, optimistic]);
-
-    try {
-      await onSend(text);
-    } catch {
-      setSending(false);
-    }
-  };
-
-  const handleStop = useCallback(async () => {
-    await fetch(instanceUrl(instanceId, `/session/${sessionId}/abort`), { method: "POST" });
-  }, [instanceId, sessionId]);
-
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit();
-    }
-  };
-
   return (
     <div class="chat-container">
       <div class="chat" ref={chatRef}>
@@ -285,32 +239,6 @@ export function Chat({ instanceId, sessionId, initialMessages, onSend }: Props) 
         <QuestionBanner questions={pendingQuestions} onReply={replyQuestion} onReject={rejectQuestion} />
       </div>
       <PermissionBanner permissions={pendingPermissions} onReply={replyPermission} />
-      <form class="input-area" onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
-        <textarea
-          value={input}
-          onInput={(e) => setInput((e.target as HTMLTextAreaElement).value)}
-          onKeyDown={handleKeyDown}
-          placeholder={sending ? "Sending..." : "Type a message..."}
-          disabled={sending}
-          rows={2}
-        />
-        <button
-          type="button"
-          class="btn btn-icon"
-          disabled={!sending}
-          onClick={handleStop}
-          aria-label="Stop"
-        >
-          <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M9,9H15V15H9" />
-          </svg>
-        </button>
-        <button type="submit" class="btn btn-icon" disabled={sending} aria-label="Send">
-          <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M15,20H9V12H4.16L12,4.16L19.84,12H15V20Z" />
-          </svg>
-        </button>
-      </form>
     </div>
   );
 }
