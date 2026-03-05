@@ -1,4 +1,4 @@
-import { marked } from "../util/highlight.js";
+import { marked, hljs } from "../util/highlight.js";
 import { useState } from "preact/hooks";
 import type { Part, ToolPart } from "../types.js";
 
@@ -55,16 +55,31 @@ function ToolPartView({ part, i }: { part: ToolPart; i: number }) {
           {state.input && (
             <>
               <div class="tool-section-label">input</div>
-              <pre>
-                <code>{JSON.stringify(state.input, null, 2)}</code>
+              <pre class="language-json">
+                <code
+                  class="language-json"
+                  dangerouslySetInnerHTML={{
+                    __html: hljs.highlight(
+                      JSON.stringify(state.input, null, 2),
+                      { language: "json" },
+                    ).value,
+                  }}
+                />
               </pre>
             </>
           )}
           {state.output && (
             <>
               <div class="tool-section-label">output</div>
-              <pre>
-                <code>{state.output}</code>
+              <pre class="language-markdown">
+                <code
+                  class="language-markdown"
+                  dangerouslySetInnerHTML={{
+                    __html: hljs.highlight(state.output, {
+                      language: "markdown",
+                    }).value,
+                  }}
+                />
               </pre>
             </>
           )}
