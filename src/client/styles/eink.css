@@ -115,6 +115,10 @@ body {
 .sidebar-section {
 }
 
+.sidebar-section + .sidebar-section {
+  margin-top: 1.5rem;
+}
+
 .sidebar-header {
   font-size: var(--text-h2);
   font-weight: bold;
