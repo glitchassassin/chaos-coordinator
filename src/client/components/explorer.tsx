@@ -84,7 +84,11 @@ export function Explorer({ rootPath }: Props) {
     return (
       <div class="explorer-file-view">
         <div class="panel-header">
-          <button class="btn btn--small" onClick={handleBack}>Back</button>
+          <button class="btn btn-icon" onClick={handleBack} aria-label="Back">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M20,9V15H12V19.84L4.16,12L12,4.16V9H20Z" />
+            </svg>
+          </button>
           <span class="panel-header-title">{relativeName}</span>
         </div>
         <div class="explorer-file-scroll">

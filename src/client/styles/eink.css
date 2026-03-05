@@ -212,6 +212,7 @@ body {
 .btn-icon {
   padding: 0;
   aspect-ratio: 1;
+  min-width: 44px;
   background: transparent;
   color: #000;
   border: none;
@@ -951,6 +952,24 @@ code[class*="language-"] {
   font-weight: bold;
   font-variant: small-caps;
   letter-spacing: 0.05em;
+}
+
+.git-diff-view .panel-header,
+.git-file-list .panel-header,
+.explorer-file-view .panel-header {
+  padding: 0;
+}
+
+.git-diff-view .panel-header .panel-header-title,
+.git-file-list .panel-header .panel-header-title,
+.explorer-file-view .panel-header .panel-header-title {
+  padding: 0.5rem 0.75rem;
+}
+
+.git-diff-view .panel-header .btn-icon,
+.git-file-list .panel-header .btn-icon,
+.explorer-file-view .panel-header .btn-icon {
+  align-self: stretch;
 }
 
 .panel-empty {
