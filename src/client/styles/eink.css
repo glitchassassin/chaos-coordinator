@@ -83,7 +83,17 @@ body {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  overflow-y: auto;
+  overflow: hidden;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 0.75rem;
+  flex-shrink: 0;
+}
+
+.sidebar-logout {
+  width: 100%;
 }
 
 .main {
@@ -141,9 +151,8 @@ body {
 /* Top bar */
 .topbar {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: space-between;
-  padding: 0.5rem 0.75rem;
   border-bottom: 2px solid rgba(0, 0, 0, 0.5);
   min-height: 44px;
   flex-shrink: 0;
@@ -154,6 +163,7 @@ body {
   align-items: center;
   gap: 0.5rem;
   min-width: 0;
+  padding: 0.5rem 0.75rem;
 }
 
 .topbar-title {
@@ -164,16 +174,14 @@ body {
   text-overflow: ellipsis;
 }
 
-.topbar-actions {
-  display: flex;
-  gap: 0.5rem;
-  flex-shrink: 0;
-}
-
 .sidebar-toggle {
   font-size: 1.25rem;
-  padding: 0.25rem 0.5rem;
+  padding: 0;
   position: relative;
+  border: none;
+  border-right: 2px solid rgba(0, 0, 0, 0.5);
+  aspect-ratio: 1;
+  align-self: stretch;
 }
 
 .activity-bubble {
@@ -706,6 +714,7 @@ code[class*="language-"] {
   display: flex;
   align-items: stretch;
   position: relative;
+  padding-right: 0.5rem;
 }
 
 .sidebar-item-row .sidebar-item {
@@ -715,25 +724,18 @@ code[class*="language-"] {
 
 .sidebar-item-remove {
   display: flex;
-  padding: 0 0.5rem;
+  width: 36px;
+  flex-shrink: 0;
+  padding: 0;
   font-size: 1.25rem;
   background: none;
   color: #000;
   border: none;
   cursor: pointer;
-  flex-shrink: 0;
   align-items: center;
   justify-content: center;
 }
 
-.sidebar-item-remove--confirm {
-  font-size: 1rem;
-  font-weight: bold;
-  padding: 0 0.5rem;
-  background: #000;
-  color: #fff;
-  border: 2px solid #000;
-}
 
 /* Remote provider icon */
 .remote-icon {
@@ -825,24 +827,25 @@ code[class*="language-"] {
 /* View toggle buttons */
 .topbar-center {
   display: flex;
-  flex-shrink: 0;
+  align-self: stretch;
 }
 
 .view-toggle-btn {
-  font-family: inherit;
-  font-size: 1rem;
-  font-variant: small-caps;
-  letter-spacing: 0.05em;
-  padding: 0.25rem 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.75rem;
   background: #fff;
   color: #000;
-  border: 2px solid #000;
+  border: none;
   cursor: pointer;
-  min-height: 36px;
+  aspect-ratio: 1;
 }
 
-.view-toggle-btn + .view-toggle-btn {
-  border-left: none;
+.view-toggle-btn svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  fill: currentColor;
 }
 
 .view-toggle-btn[aria-selected="true"] {

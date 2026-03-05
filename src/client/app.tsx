@@ -416,19 +416,22 @@ export function App() {
               pendingIds={pendingSessionIds}
             />
           )}
+          <div class="sidebar-footer">
+            <a href="/logout" class="btn sidebar-logout">Logout</a>
+          </div>
         </aside>
       )}
       <main class="main">
         <header class="topbar">
+          <button
+            class="btn sidebar-toggle"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+          >
+            ☰
+            {hasActivity && <span class="activity-bubble" aria-hidden="true">*</span>}
+          </button>
           <div class="topbar-left">
-            <button
-              class="btn sidebar-toggle"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-            >
-              ☰
-              {hasActivity && <span class="activity-bubble" aria-hidden="true">*</span>}
-            </button>
             <h1 class="topbar-title">
               {selectedInstance && selectedSession
                 ? `${selectedName} / ${selectedSession.slice(0, 12)}`
@@ -437,23 +440,41 @@ export function App() {
           </div>
           {selectedInstance && selectedSession && (
             <div class="topbar-center">
-              {(["chat", "git", "explorer"] as const).map((v) => (
-                <button
-                  key={v}
-                  class="view-toggle-btn"
-                  aria-selected={sessionView === v}
-                  onClick={() => setSessionView(v)}
-                >
-                  {v === "chat" ? "Chat" : v === "git" ? "Git" : "Files"}
-                </button>
-              ))}
+              <button
+                class="view-toggle-btn"
+                aria-selected={sessionView === "chat"}
+                aria-label="Chat"
+                onClick={() => setSessionView("chat")}
+              >
+                {/* mdi:message */}
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M20,2H4A2,2 0 0,0 2,4V22L6,18H20A2,2 0 0,0 22,16V4A2,2 0 0,0 20,2Z" />
+                </svg>
+              </button>
+              <button
+                class="view-toggle-btn"
+                aria-selected={sessionView === "git"}
+                aria-label="Git"
+                onClick={() => setSessionView("git")}
+              >
+                {/* mdi:source-branch */}
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M13,14C9.64,14 8.54,15.35 8.18,16.24C9.25,16.7 10,17.76 10,19A3,3 0 0,1 7,22A3,3 0 0,1 4,19C4,17.69 4.83,16.58 6,16.17V7.83C4.83,7.42 4,6.31 4,5A3,3 0 0,1 7,2A3,3 0 0,1 10,5C10,6.31 9.17,7.42 8,7.83V13.12C8.88,12.47 10.16,12 12,12C14.67,12 15.56,10.87 15.85,10C14.71,9.55 13.91,8.38 13.91,7A3.09,3.09 0 0,1 17,3.91A3.09,3.09 0 0,1 20.09,7C20.09,8.37 19.29,9.54 18.15,10C17.88,11.17 17.08,14 13,14Z" />
+                </svg>
+              </button>
+              <button
+                class="view-toggle-btn"
+                aria-selected={sessionView === "explorer"}
+                aria-label="Files"
+                onClick={() => setSessionView("explorer")}
+              >
+                {/* mdi:folder */}
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6H12L10,4Z" />
+                </svg>
+              </button>
             </div>
           )}
-          <div class="topbar-actions">
-            <a href="/logout" class="btn">
-              Logout
-            </a>
-          </div>
         </header>
         {view === "new-instance" ? (
           <DirectoryPicker

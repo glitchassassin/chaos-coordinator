@@ -22,10 +22,20 @@ function DeleteButton({ onDelete, label }: { onDelete: () => void; label: string
   return (
     <button
       class={`sidebar-item-remove${pending ? " sidebar-item-remove--confirm" : ""}`}
-      aria-label={label}
+      aria-label={pending ? "Confirm delete" : label}
       {...getButtonProps({ onClick: pending ? onDelete : undefined })}
     >
-      {pending ? "Confirm?" : "×"}
+      {pending ? (
+        /* mdi:check-circle */
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" width="1.25em" height="1.25em" fill="currentColor">
+          <path d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M11,16.5L18,9.5L16.59,8.09L11,13.67L7.91,10.59L6.5,12L11,16.5Z" />
+        </svg>
+      ) : (
+        /* mdi:delete-forever */
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" width="1.25em" height="1.25em" fill="currentColor">
+          <path d="M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19M8.46,11.88L9.87,10.46L12,12.59L14.12,10.46L15.54,11.88L13.41,14L15.54,16.12L14.12,17.54L12,15.41L9.87,17.54L8.46,16.12L10.59,14L8.46,11.88M15.5,4L14.5,3H9.5L8.5,4H5V6H19V4H15.5Z" />
+        </svg>
+      )}
     </button>
   );
 }
