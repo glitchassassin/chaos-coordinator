@@ -66,8 +66,15 @@ function highlightLines(
   });
 }
 
+interface GitInfo {
+  branch: string | null;
+  ahead: number;
+  behind: number;
+}
+
 export function GitStatus({ instanceId, onInsertMention }: Props) {
   const [files, setFiles] = useState<FileStatus[]>([]);
+  const [gitInfo, setGitInfo] = useState<GitInfo | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [diffLines, setDiffLines] = useState<DiffLine[] | null>(null);
   const [highlightedHtml, setHighlightedHtml] = useState<string[]>([]);
@@ -77,6 +84,10 @@ export function GitStatus({ instanceId, onInsertMention }: Props) {
 
   const loadFiles = useCallback(() => {
     setLoading(true);
+    fetch(`/api/instances/${instanceId}/git/info`)
+      .then((r) => r.json())
+      .then((data: GitInfo) => setGitInfo(data))
+      .catch(console.error);
     fetch(instanceUrl(instanceId, "/file/status"))
       .then((r) => r.json())
       .then((data) => {
@@ -214,6 +225,21 @@ export function GitStatus({ instanceId, onInsertMention }: Props) {
     <div class="git-file-list">
       <div class="panel-header">
         <span class="panel-header-title">Changes</span>
+        {gitInfo?.branch && (
+          <span class="git-branch-info">
+            {/* mdi:source-branch */}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M13,14C9.64,14 8.54,15.35 8.18,16.24C9.25,16.7 10,17.76 10,19A3,3 0 0,1 7,22A3,3 0 0,1 4,19C4,17.69 4.83,16.58 6,16.17V7.83C4.83,7.42 4,6.31 4,5A3,3 0 0,1 7,2A3,3 0 0,1 10,5C10,6.31 9.17,7.42 8,7.83V13.12C8.88,12.47 10.16,12 12,12C14.67,12 15.56,10.87 15.85,10C14.71,9.55 13.91,8.38 13.91,7A3.09,3.09 0 0,1 17,3.91A3.09,3.09 0 0,1 20.09,7C20.09,8.37 19.29,9.54 18.15,10C17.88,11.17 17.08,14 13,14Z" />
+            </svg>
+            <span class="git-branch-name">{gitInfo.branch}</span>
+            {(gitInfo.ahead > 0 || gitInfo.behind > 0) && (
+              <span class="git-sync-counts">
+                {gitInfo.behind > 0 && <span class="git-sync-behind" title={`${gitInfo.behind} to pull`}>↓{gitInfo.behind}</span>}
+                {gitInfo.ahead > 0 && <span class="git-sync-ahead" title={`${gitInfo.ahead} to push`}>↑{gitInfo.ahead}</span>}
+              </span>
+            )}
+          </span>
+        )}
         <button class="btn btn-icon" onClick={loadFiles} aria-label="Refresh">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z" />

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
+import { execSync } from "node:child_process";
 
 function detectGitRemote(directory: string): "github" | "azuredevops" | undefined {
   try {
@@ -168,6 +169,27 @@ app.get("/api/fs/content", (c) => {
   } catch {
     return c.json({ error: "Cannot read file" }, 400);
   }
+});
+
+// Git branch info for an instance
+app.get("/api/instances/:id/git/info", (c) => {
+  const id = c.req.param("id");
+  const instance = getInstance(id);
+  if (!instance) return c.json({ error: "Instance not found" }, 404);
+  const cwd = instance.directory;
+  const run = (cmd: string) => {
+    try { return execSync(cmd, { cwd, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] }).trim(); }
+    catch { return null; }
+  };
+  const branch = run("git rev-parse --abbrev-ref HEAD");
+  const counts = run("git rev-list --left-right --count HEAD...@{upstream}");
+  let ahead = 0, behind = 0;
+  if (counts) {
+    const parts = counts.split(/\s+/);
+    ahead = parseInt(parts[0] ?? "0", 10) || 0;
+    behind = parseInt(parts[1] ?? "0", 10) || 0;
+  }
+  return c.json({ branch, ahead, behind });
 });
 
 // Reverse proxy to opencode instances

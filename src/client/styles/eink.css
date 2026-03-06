@@ -1009,6 +1009,39 @@ code[class*="language-"] {
   align-self: stretch;
 }
 
+.git-branch-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  font-size: var(--text-sm);
+  font-family: "Fira Code", ui-monospace, monospace;
+  padding: 0 0.5rem;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.git-branch-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.git-sync-counts {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+}
+
+.git-sync-ahead,
+.git-sync-behind {
+  font-size: var(--text-sm);
+  font-weight: bold;
+}
+
 .panel-empty {
   padding: 1rem;
   font-size: 1rem;
