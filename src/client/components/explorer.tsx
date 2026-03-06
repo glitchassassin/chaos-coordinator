@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from "preact/hooks";
+import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { highlight, extensionToLanguage } from "../util/highlight.js";
 import { basename, dirname } from "../util/path.js";
 
 interface Props {
   instanceId: string;
   rootPath: string;
+  onInsertMention?: (filePath: string, startLine: number, endLine: number) => void;
 }
 
 interface FsEntry {
@@ -13,7 +14,7 @@ interface FsEntry {
   type: "file" | "directory";
 }
 
-export function Explorer({ rootPath }: Props) {
+export function Explorer({ rootPath, onInsertMention }: Props) {
   const [currentPath, setCurrentPath] = useState(rootPath);
   const [entries, setEntries] = useState<FsEntry[]>([]);
   const [fileContent, setFileContent] = useState<string | null>(null);
@@ -21,6 +22,8 @@ export function Explorer({ rootPath }: Props) {
   const [fileLang, setFileLang] = useState<string | null>(null);
   const [isBinary, setIsBinary] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [selectionInfo, setSelectionInfo] = useState<{ rect: DOMRect; startLine: number; endLine: number } | null>(null);
+  const fileScrollRef = useRef<HTMLDivElement | null>(null);
 
   const loadDirectory = useCallback((path: string) => {
     setLoading(true);
@@ -70,6 +73,36 @@ export function Explorer({ rootPath }: Props) {
     setIsBinary(false);
   }, []);
 
+  const getLineNumber = useCallback((node: Node): number | null => {
+    let el: Element | null = node instanceof Element ? node : node.parentElement;
+    while (el) {
+      if (el.classList.contains("diff-line")) {
+        const lineno = el.querySelector(".diff-lineno");
+        if (lineno) return parseInt(lineno.textContent || "0", 10);
+      }
+      el = el.parentElement;
+    }
+    return null;
+  }, []);
+
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const sel = window.getSelection();
+      if (sel && sel.toString().length > 0 && fileScrollRef.current?.contains(sel.anchorNode)) {
+        const range = sel.getRangeAt(0);
+        const startLine = getLineNumber(range.startContainer);
+        const endLine = getLineNumber(range.endContainer);
+        if (startLine !== null && endLine !== null) {
+          setSelectionInfo({ rect: range.getBoundingClientRect(), startLine, endLine });
+          return;
+        }
+      }
+      setSelectionInfo(null);
+    };
+    document.addEventListener("selectionchange", handleSelectionChange);
+    return () => document.removeEventListener("selectionchange", handleSelectionChange);
+  }, [getLineNumber]);
+
   const navigateUp = useCallback(() => {
     const parent = dirname(currentPath);
     if (parent.length >= rootPath.length) {
@@ -91,7 +124,7 @@ export function Explorer({ rootPath }: Props) {
           </button>
           <span class="panel-header-title">{relativeName}</span>
         </div>
-        <div class="explorer-file-scroll">
+        <div class="explorer-file-scroll" ref={fileScrollRef}>
           {isBinary ? (
             <div class="panel-empty">Binary file</div>
           ) : (
@@ -105,6 +138,24 @@ export function Explorer({ rootPath }: Props) {
             </code></pre>
           )}
         </div>
+        {selectionInfo && onInsertMention && (
+          <button
+            class="btn file-mention-btn"
+            style={`position: fixed; top: ${selectionInfo.rect.top - 4}px; left: ${fileScrollRef.current?.querySelector(".diff-lineno")?.getBoundingClientRect().right ?? selectionInfo.rect.left}px; transform: translateY(-100%);`}
+            onPointerDown={(e) => e.preventDefault()}
+            onClick={() => {
+              onInsertMention(filePath!, selectionInfo.startLine, selectionInfo.endLine);
+              setSelectionInfo(null);
+              window.getSelection()?.removeAllRanges();
+            }}
+            aria-label="Insert file mention"
+          >
+            {/* mdi:arrow-down-bold */}
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M9,4H15V12H19.84L12,19.84L4.16,12H9V4Z" />
+            </svg>
+          </button>
+        )}
       </div>
     );
   }

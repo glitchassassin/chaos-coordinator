@@ -40,6 +40,8 @@ export function App() {
   const selectedInstanceRef = useRef<string | null>(selectedInstance);
   const sessionRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messageRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const cursorPosRef = useRef<number>(0);
   useEffect(() => { selectedSessionRef.current = selectedSession; }, [selectedSession]);
   useEffect(() => { selectedInstanceRef.current = selectedInstance; }, [selectedInstance]);
 
@@ -350,6 +352,38 @@ export function App() {
     }
   }, [handleSubmit]);
 
+  const handleTextareaBlur = useCallback(() => {
+    if (textareaRef.current) {
+      cursorPosRef.current = textareaRef.current.selectionStart ?? 0;
+    }
+  }, []);
+
+  const handleInsertMention = useCallback((filePath: string, startLine: number, endLine: number) => {
+    const rootPath = instances.find((i) => i.id === selectedInstance)?.directory || "";
+    const rel = filePath.startsWith(rootPath)
+      ? filePath.slice(rootPath.length).replace(/^\//, "")
+      : filePath;
+    const lineRange = startLine === endLine ? `${startLine}` : `${startLine}-${endLine}`;
+    const mention = `@${rel}:${lineRange}`;
+    const pos = cursorPosRef.current;
+    setInput((prev) => {
+      const before = prev.slice(0, pos);
+      const after = prev.slice(pos);
+      const prefix = before.length > 0 && !before.endsWith(" ") ? " " : "";
+      const suffix = after.length > 0 && !after.startsWith(" ") ? " " : "";
+      const inserted = prefix + mention + suffix;
+      cursorPosRef.current = pos + prefix.length + mention.length;
+      return before + inserted + after;
+    });
+    setTimeout(() => {
+      const el = textareaRef.current;
+      if (el) {
+        el.focus();
+        el.setSelectionRange(cursorPosRef.current, cursorPosRef.current);
+      }
+    }, 0);
+  }, [instances, selectedInstance]);
+
   const handleNewInstance = useCallback(() => {
     setView("new-instance");
   }, []);
@@ -507,7 +541,7 @@ export function App() {
         ) : sessionView === "git" ? (
           <GitStatus instanceId={selectedInstance} />
         ) : sessionView === "explorer" ? (
-          <Explorer instanceId={selectedInstance} rootPath={instances.find((i) => i.id === selectedInstance)?.directory || "/"} />
+          <Explorer instanceId={selectedInstance} rootPath={instances.find((i) => i.id === selectedInstance)?.directory || "/"} onInsertMention={handleInsertMention} />
         ) : (
           <Chat
             instanceId={selectedInstance}
@@ -519,9 +553,11 @@ export function App() {
         {selectedInstance && view !== "new-instance" && (
           <form class="input-area" onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
             <textarea
+              ref={textareaRef}
               value={input}
               onInput={(e) => setInput((e.target as HTMLTextAreaElement).value)}
               onKeyDown={handleKeyDown}
+              onBlur={handleTextareaBlur}
               placeholder={sending ? "Sending..." : "Type a message..."}
               disabled={sending}
               rows={2}

@@ -955,6 +955,12 @@ code[class*="language-"] {
   font-size: 1rem;
 }
 
+.file-mention-btn {
+  padding: 0.25rem;
+  line-height: 0;
+  z-index: 100;
+}
+
 .panel-header {
   display: flex;
   align-items: center;
