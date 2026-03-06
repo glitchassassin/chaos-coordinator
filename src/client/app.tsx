@@ -307,21 +307,25 @@ export function App() {
     };
   }, [selectedInstance, selectedSession]);
 
+  // Ensure a session exists, returning its ID
+  const ensureSession = useCallback(async (): Promise<string | null> => {
+    if (!selectedInstance) return null;
+    if (selectedSession) return selectedSession;
+    const res = await fetch(apiUrl(selectedInstance, "/session"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const session: Session = await res.json();
+    setSelectedSession(session.id);
+    return session.id;
+  }, [selectedInstance, selectedSession]);
+
   // Fire-and-forget send — SSE delivers updates
   const handleSendMessage = useCallback(
     async (text: string) => {
-      if (!selectedInstance) return;
-      let sessionId = selectedSession;
-      if (!sessionId) {
-        const res = await fetch(apiUrl(selectedInstance, "/session"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
-        });
-        const session: Session = await res.json();
-        setSelectedSession(session.id);
-        sessionId = session.id;
-      }
+      const sessionId = await ensureSession();
+      if (!sessionId || !selectedInstance) return;
       await fetch(
         apiUrl(selectedInstance, `/session/${sessionId}/prompt_async`),
         {
@@ -333,7 +337,24 @@ export function App() {
         },
       );
     },
-    [selectedInstance, selectedSession],
+    [selectedInstance, ensureSession],
+  );
+
+  // Shell command — synchronous, SSE delivers streaming updates
+  const handleSendShell = useCallback(
+    async (command: string) => {
+      const sessionId = await ensureSession();
+      if (!sessionId || !selectedInstance) return;
+      await fetch(
+        apiUrl(selectedInstance, `/session/${sessionId}/shell`),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ agent: "build", command }),
+        },
+      );
+    },
+    [selectedInstance, ensureSession],
   );
 
   const handleSubmit = useCallback(async () => {
@@ -344,11 +365,15 @@ export function App() {
     setSending(true);
     setSessionView("chat");
     try {
-      await handleSendMessage(text);
+      if (text.startsWith("!")) {
+        await handleSendShell(text.slice(1).trim());
+      } else {
+        await handleSendMessage(text);
+      }
     } catch {
       setSending(false);
     }
-  }, [input, sending, selectedInstance, handleSendMessage]);
+  }, [input, sending, selectedInstance, selectedSession, handleSendMessage, handleSendShell]);
 
   const handleStop = useCallback(async () => {
     if (!selectedInstance || !selectedSession) return;
