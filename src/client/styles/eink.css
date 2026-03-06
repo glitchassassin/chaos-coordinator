@@ -306,15 +306,29 @@ body {
 
 .tool-block {
   margin: 0.5rem 0;
+  position: relative;
 }
 
 .tool-toggle {
-  background: none;
+  position: absolute;
+  top: 0;
+  right: 100%;
+  background: #fff;
+  color: #000;
   border: none;
-  padding: 0;
+  padding: 0.1rem;
   cursor: pointer;
-  font-size: 1rem;
-  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.tool-toggle svg {
+  width: 1rem;
+  height: 1rem;
+  display: block;
 }
 
 .tool-toggle:focus {
@@ -399,15 +413,29 @@ body {
 
 .thinking-block {
   margin: 0.5rem 0;
+  position: relative;
 }
 
 .thinking-toggle {
-  background: none;
+  position: absolute;
+  top: 0;
+  right: 100%;
+  background: #fff;
+  color: #000;
   border: none;
-  padding: 0;
+  padding: 0.1rem;
   cursor: pointer;
-  font-size: 1rem;
-  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.thinking-toggle svg {
+  width: 1rem;
+  height: 1rem;
+  display: block;
 }
 
 .thinking-toggle:focus {
@@ -420,18 +448,13 @@ body {
 }
 
 .thinking-content {
-  margin-left: 1.5rem;
+  border-left: 2px solid rgba(0, 0, 0, 0.5);
+  padding: 0.25rem 0.5rem;
   white-space: pre-wrap;
   word-break: break-word;
   font-size: 1rem;
   font-style: italic;
   margin-top: 0.5rem;
-}
-
-.thinking-hr {
-  border: none;
-  border-top: 2px solid #000;
-  margin: 0.5rem -1.5rem 0 -1.5rem;
 }
 
 .message-content pre,

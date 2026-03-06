@@ -8,6 +8,24 @@ interface Props {
   showRole?: boolean;
 }
 
+function ExpandIcon() {
+  return (
+    // mdi:arrow-expand-vertical
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+      <path d="M13,9V15H16L12,19L8,15H11V9H8L12,5L16,9H13M4,2H20V4H4V2M4,20H20V22H4V20Z" />
+    </svg>
+  );
+}
+
+function CollapseIcon() {
+  return (
+    // mdi:arrow-collapse-vertical
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+      <path d="M4,12H20V14H4V12M4,9H20V11H4V9M16,4L12,8L8,4H11V1H13V4H16M8,19L12,15L16,19H13V22H11V19H8Z" />
+    </svg>
+  );
+}
+
 function ThinkingBlock({ text, i }: { text: string; i: number }) {
   const [expanded, setExpanded] = useState(false);
   return (
@@ -15,13 +33,14 @@ function ThinkingBlock({ text, i }: { text: string; i: number }) {
       <button
         class="thinking-toggle"
         onClick={() => setExpanded((e) => !e)}
+        aria-label={expanded ? "Collapse" : "Expand"}
       >
-        <em>Thinking... ({expanded ? "collapse" : "expand"})</em>
+        {expanded ? <CollapseIcon /> : <ExpandIcon />}
       </button>
+      <em>Thinking...</em>
       {expanded && (
         <div class="thinking-content">
           {text}
-          <hr class="thinking-hr" />
         </div>
       )}
     </div>
@@ -48,17 +67,7 @@ function BashToolView({ part, i }: { part: ToolPart; i: number }) {
           onClick={() => setExpanded((e) => !e)}
           aria-label={expanded ? "Collapse" : "Expand"}
         >
-          {expanded ? (
-            // mdi:arrow-collapse-vertical
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
-              <path d="M4,12H20V14H4V12M4,9H20V11H4V9M16,4L12,8L8,4H11V1H13V4H16M8,19L12,15L16,19H13V22H11V19H8Z" />
-            </svg>
-          ) : (
-            // mdi:arrow-expand-vertical
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
-              <path d="M13,9V15H16L12,19L8,15H11V9H8L12,5L16,9H13M4,2H20V4H4V2M4,20H20V22H4V20Z" />
-            </svg>
-          )}
+          {expanded ? <CollapseIcon /> : <ExpandIcon />}
         </button>
       )}
       <pre class="bash-tool-pre">
@@ -104,12 +113,14 @@ function ToolPartView({ part, i }: { part: ToolPart; i: number }) {
 
   return (
     <div key={i} class="tool-block">
-      <button class="tool-toggle" onClick={() => setExpanded((e) => !e)}>
-        <em>
-          {title}
-          {statusSuffix} ({expanded ? "collapse" : "expand"})
-        </em>
+      <button
+        class="tool-toggle"
+        onClick={() => setExpanded((e) => !e)}
+        aria-label={expanded ? "Collapse" : "Expand"}
+      >
+        {expanded ? <CollapseIcon /> : <ExpandIcon />}
       </button>
+      <em>{title !== tool ? `${tool}: ${title}` : tool}{statusSuffix}</em>
       {expanded && (
         <div class="tool-content">
           {state.input && (
