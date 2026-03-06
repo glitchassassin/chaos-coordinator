@@ -384,7 +384,7 @@ body {
 
 .message-content code,
 .tool-content code {
-  font-family: ui-monospace, monospace;
+  font-family: "Fira Code", ui-monospace, monospace;
   font-size: 1rem;
 }
 
@@ -689,7 +689,7 @@ code[class*="language-"] {
   color: #fff;
   border: 2px solid #000;
   font-size: 1rem;
-  font-family: ui-monospace, monospace;
+  font-family: "Fira Code", ui-monospace, monospace;
   padding: 0.1rem 0.4rem;
   cursor: pointer;
 }
@@ -933,7 +933,7 @@ code[class*="language-"] {
 }
 
 .git-diff-scroll code {
-  font-family: ui-monospace, monospace;
+  font-family: "Fira Code", ui-monospace, monospace;
   font-size: 1rem;
 }
 
@@ -964,7 +964,7 @@ code[class*="language-"] {
 }
 
 .explorer-file-scroll code {
-  font-family: ui-monospace, monospace;
+  font-family: "Fira Code", ui-monospace, monospace;
   font-size: 1rem;
 }
 
@@ -1021,7 +1021,7 @@ code[class*="language-"] {
   width: 100%;
   padding: 0.5rem 0.75rem;
   font-size: 1rem;
-  font-family: ui-monospace, monospace;
+  font-family: "Fira Code", ui-monospace, monospace;
   background: #fff;
   color: #000;
   border: none;
