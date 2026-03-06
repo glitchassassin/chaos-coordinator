@@ -539,7 +539,7 @@ export function App() {
         ) : !selectedInstance ? (
           <div class="empty-state">Select an instance to get started.</div>
         ) : sessionView === "git" ? (
-          <GitStatus instanceId={selectedInstance} />
+          <GitStatus instanceId={selectedInstance} onInsertMention={handleInsertMention} />
         ) : sessionView === "explorer" ? (
           <Explorer instanceId={selectedInstance} rootPath={instances.find((i) => i.id === selectedInstance)?.directory || "/"} onInsertMention={handleInsertMention} />
         ) : (

@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from "preact/hooks";
+import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { highlight, escapeHtml, extensionToLanguage } from "../util/highlight.js";
 import { instanceUrl } from "../hooks/use-api.js";
 import type { FileStatus, FileContent } from "../types.js";
 
 interface Props {
   instanceId: string;
+  onInsertMention?: (filePath: string, startLine: number, endLine: number) => void;
 }
 
 interface DiffLine {
@@ -65,12 +66,14 @@ function highlightLines(
   });
 }
 
-export function GitStatus({ instanceId }: Props) {
+export function GitStatus({ instanceId, onInsertMention }: Props) {
   const [files, setFiles] = useState<FileStatus[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [diffLines, setDiffLines] = useState<DiffLine[] | null>(null);
   const [highlightedHtml, setHighlightedHtml] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selectionInfo, setSelectionInfo] = useState<{ rect: DOMRect; startLine: number; endLine: number } | null>(null);
+  const diffScrollRef = useRef<HTMLDivElement | null>(null);
 
   const loadFiles = useCallback(() => {
     setLoading(true);
@@ -123,7 +126,42 @@ export function GitStatus({ instanceId }: Props) {
     setSelected(null);
     setDiffLines(null);
     setHighlightedHtml([]);
+    setSelectionInfo(null);
   }, []);
+
+  const getLineNumber = useCallback((node: Node): number | null => {
+    let el: Element | null = node instanceof Element ? node : node.parentElement;
+    while (el) {
+      if (el.classList.contains("diff-line")) {
+        // Two .diff-lineno spans (old, new) — prefer last non-empty (new side)
+        const linenos = el.querySelectorAll(".diff-lineno");
+        for (let i = linenos.length - 1; i >= 0; i--) {
+          const text = linenos[i].textContent?.trim();
+          if (text) return parseInt(text, 10);
+        }
+      }
+      el = el.parentElement;
+    }
+    return null;
+  }, []);
+
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const sel = window.getSelection();
+      if (sel && sel.toString().length > 0 && diffScrollRef.current?.contains(sel.anchorNode)) {
+        const range = sel.getRangeAt(0);
+        const startLine = getLineNumber(range.startContainer);
+        const endLine = getLineNumber(range.endContainer);
+        if (startLine !== null && endLine !== null) {
+          setSelectionInfo({ rect: range.getBoundingClientRect(), startLine, endLine });
+          return;
+        }
+      }
+      setSelectionInfo(null);
+    };
+    document.addEventListener("selectionchange", handleSelectionChange);
+    return () => document.removeEventListener("selectionchange", handleSelectionChange);
+  }, [getLineNumber]);
 
   if (selected && diffLines !== null) {
     return (
@@ -136,7 +174,7 @@ export function GitStatus({ instanceId }: Props) {
           </button>
           <span class="panel-header-title">{selected}</span>
         </div>
-        <div class="git-diff-scroll">
+        <div class="git-diff-scroll" ref={diffScrollRef}>
           <pre class="diff-view">
             <code class="language-plaintext">
               {diffLines.map((line, i) => (
@@ -150,6 +188,24 @@ export function GitStatus({ instanceId }: Props) {
             </code>
           </pre>
         </div>
+        {selectionInfo && onInsertMention && (
+          <button
+            class="btn file-mention-btn"
+            style={`position: fixed; top: ${selectionInfo.rect.top - 4}px; left: ${diffScrollRef.current?.querySelector(".diff-line > span:last-child")?.getBoundingClientRect().left ?? selectionInfo.rect.left}px; transform: translateY(-100%);`}
+            onPointerDown={(e) => e.preventDefault()}
+            onClick={() => {
+              onInsertMention(selected!, selectionInfo.startLine, selectionInfo.endLine);
+              setSelectionInfo(null);
+              window.getSelection()?.removeAllRanges();
+            }}
+            aria-label="Insert file mention"
+          >
+            {/* mdi:arrow-down-bold */}
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M9,4H15V12H19.84L12,19.84L4.16,12H9V4Z" />
+            </svg>
+          </button>
+        )}
       </div>
     );
   }
