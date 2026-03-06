@@ -338,7 +338,7 @@ export function App() {
 
   const handleSubmit = useCallback(async () => {
     const text = input.trim();
-    if (!text || sending || !selectedInstance) return;
+    if (!text || !selectedInstance) return;
     setInput("");
     if (selectedSession) draftRef.current.delete(selectedSession);
     setSending(true);
@@ -568,8 +568,7 @@ export function App() {
               onInput={(e) => setInput((e.target as HTMLTextAreaElement).value)}
               onKeyDown={handleKeyDown}
               onBlur={handleTextareaBlur}
-              placeholder={sending ? "Sending..." : "Type a message..."}
-              disabled={sending}
+              placeholder="Type a message..."
               rows={2}
             />
             <button
@@ -583,7 +582,7 @@ export function App() {
                 <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M9,9H15V15H9" />
               </svg>
             </button>
-            <button type="submit" class="btn btn-icon" disabled={sending} aria-label="Send">
+            <button type="submit" class="btn btn-icon" aria-label="Send">
               <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M15,20H9V12H4.16L12,4.16L19.84,12H15V20Z" />
               </svg>
