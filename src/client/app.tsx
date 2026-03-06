@@ -42,6 +42,8 @@ export function App() {
   const messageRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const cursorPosRef = useRef<number>(0);
+  const draftRef = useRef<Map<string, string>>(new Map());
+  const prevSessionRef = useRef<string | null>(selectedSession);
   useEffect(() => { selectedSessionRef.current = selectedSession; }, [selectedSession]);
   useEffect(() => { selectedInstanceRef.current = selectedInstance; }, [selectedInstance]);
 
@@ -81,6 +83,13 @@ export function App() {
 
   useEffect(() => {
     setSessionView("chat");
+    // Save draft for the session we're leaving, restore for the one we're entering
+    const prevSession = prevSessionRef.current;
+    prevSessionRef.current = selectedSession;
+    setInput((currentInput) => {
+      if (prevSession) draftRef.current.set(prevSession, currentInput);
+      return selectedSession ? (draftRef.current.get(selectedSession) ?? "") : "";
+    });
     if (selectedSession) {
       sessionStorage.setItem("selectedSession", selectedSession);
       setUnreadSessions((prev) => {
@@ -331,6 +340,7 @@ export function App() {
     const text = input.trim();
     if (!text || sending || !selectedInstance) return;
     setInput("");
+    if (selectedSession) draftRef.current.delete(selectedSession);
     setSending(true);
     setSessionView("chat");
     try {
