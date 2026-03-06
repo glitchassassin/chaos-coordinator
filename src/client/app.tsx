@@ -7,7 +7,7 @@ import { Explorer } from "./components/explorer.js";
 import { SessionSettings } from "./components/session-settings.js";
 import { DirectoryPicker } from "./components/directory-picker.js";
 import { useSSE } from "./hooks/use-sse.js";
-import type { Instance, Session, MessageWithParts, SSEEvent, ModelKey } from "./types.js";
+import type { Instance, Session, MessageWithParts, SSEEvent, ModelKey, SessionStatus } from "./types.js";
 
 type View = "main" | "new-instance";
 type SessionView = "chat" | "git" | "explorer" | "settings";
@@ -31,7 +31,7 @@ export function App() {
   const [view, setView] = useState<View>("main");
   const [sessionView, setSessionView] = useState<SessionView>("chat");
   const [input, setInput] = useState("");
-  const [sending, setSending] = useState(false);
+  const [busy, setBusy] = useState(false);
   // sessionId -> ModelKey for per-session model overrides
   const [sessionModels, setSessionModels] = useState<Map<string, ModelKey>>(() => new Map());
   const selectedModel = selectedSession ? (sessionModels.get(selectedSession) ?? null) : null;
@@ -86,6 +86,7 @@ export function App() {
   }, [selectedInstance]);
 
   useEffect(() => {
+    setBusy(false);
     setSessionView("chat");
     // Save draft for the session we're leaving, restore for the one we're entering
     const prevSession = prevSessionRef.current;
@@ -255,6 +256,13 @@ export function App() {
           });
         }
       }
+
+      if (evt.type === "session.status") {
+        const { sessionID, status } = evt.properties as { sessionID: string; status: SessionStatus };
+        if (sessionID === selectedSessionRef.current && instanceId === selectedInstanceRef.current) {
+          setBusy(status.type === "busy");
+        }
+      }
     },
     [],
   );
@@ -367,18 +375,13 @@ export function App() {
     if (!text || !selectedInstance) return;
     setInput("");
     if (selectedSession) draftRef.current.delete(selectedSession);
-    setSending(true);
     setSessionView("chat");
-    try {
-      if (text.startsWith("!")) {
-        await handleSendShell(text.slice(1).trim());
-      } else {
-        await handleSendMessage(text);
-      }
-    } catch {
-      setSending(false);
+    if (text.startsWith("!")) {
+      await handleSendShell(text.slice(1).trim());
+    } else {
+      await handleSendMessage(text);
     }
-  }, [input, sending, selectedInstance, selectedSession, handleSendMessage, handleSendShell]);
+  }, [input, selectedInstance, selectedSession, handleSendMessage, handleSendShell]);
 
   const handleStop = useCallback(async () => {
     if (!selectedInstance || !selectedSession) return;
@@ -615,7 +618,6 @@ export function App() {
             instanceId={selectedInstance}
             sessionId={selectedSession ?? ""}
             initialMessages={selectedSession ? messages : []}
-            setSending={setSending}
           />
         )}
         {selectedInstance && view !== "new-instance" && (
@@ -632,7 +634,7 @@ export function App() {
             <button
               type="button"
               class="btn btn-icon"
-              disabled={!sending}
+              disabled={!busy}
               onClick={handleStop}
               aria-label="Stop"
             >

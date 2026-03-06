@@ -104,6 +104,9 @@ export interface ApiError {
   data?: Record<string, unknown>;
 }
 
+// Session busy/idle status from session.status events
+export type SessionStatus = { type: "busy" } | { type: "idle" };
+
 // SSE event envelope
 export interface SSEEvent {
   type: string;

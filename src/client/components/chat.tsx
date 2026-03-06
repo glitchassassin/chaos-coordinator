@@ -11,10 +11,9 @@ interface Props {
   instanceId: string;
   sessionId: string;
   initialMessages: MessageWithParts[];
-  setSending: (v: boolean) => void;
 }
 
-export function Chat({ instanceId, sessionId, initialMessages, setSending }: Props) {
+export function Chat({ instanceId, sessionId, initialMessages }: Props) {
   const [messages, setMessages] = useState<MessageWithParts[]>(initialMessages);
   const [sessionErrors, setSessionErrors] = useState<Array<{ id: string; error: ApiError }>>([]);
   const [pendingPermissions, setPendingPermissions] = useState<PermissionRequest[]>([]);
@@ -62,9 +61,6 @@ export function Chat({ instanceId, sessionId, initialMessages, setSending }: Pro
       if (evt.type === "message.updated") {
         const info = props.info as MessageInfo;
         if (info.sessionID !== sessionId) return;
-        if (info.role === "assistant" && info.time.completed) {
-          setSending(false);
-        }
         setMessages((prev) => {
           const idx = prev.findIndex((m) => m.info.id === info.id);
           if (idx >= 0) {
@@ -162,7 +158,6 @@ export function Chat({ instanceId, sessionId, initialMessages, setSending }: Pro
       if (evt.type === "session.error") {
         const { sessionID: sid, error } = props as { sessionID?: string; error: ApiError };
         if (sid && sid !== sessionId) return;
-        setSending(false);
         setSessionErrors((prev) => [...prev, { id: `${Date.now()}-${prev.length}`, error }]);
       }
     },
