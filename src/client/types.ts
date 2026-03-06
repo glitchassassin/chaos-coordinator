@@ -104,6 +104,31 @@ export interface SSEEvent {
   properties: Record<string, unknown>;
 }
 
+// Provider/model types from GET /provider
+export interface ProviderModel {
+  id: string;
+  name: string;
+  reasoning: boolean;
+  cost?: { input: number; output: number; cache_read?: number; cache_write?: number };
+  limit: { context: number; output: number };
+  status?: "alpha" | "beta" | "deprecated";
+  [key: string]: unknown;
+}
+export interface Provider {
+  id: string;
+  name: string;
+  models: Record<string, ProviderModel>;
+}
+export interface ProviderList {
+  all: Provider[];
+  connected: string[];
+  default: Record<string, string>;
+}
+export interface ModelKey {
+  providerID: string;
+  modelID: string;
+}
+
 // Filesystem entry for directory picker
 export interface FsEntry {
   name: string;
