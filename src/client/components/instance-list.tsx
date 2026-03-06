@@ -17,6 +17,15 @@ function AzureDevOpsIcon() {
   );
 }
 
+function FolderIcon() {
+  return (
+    /* mdi:folder */
+    <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" class="remote-icon">
+      <path d="M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6H12L10,4Z" />
+    </svg>
+  );
+}
+
 interface Instance {
   id: string;
   name: string;
@@ -58,41 +67,68 @@ function RemoveButton({ onRemove, label }: { onRemove: () => void; label: string
   );
 }
 
+function InstanceButton({ inst, isSelected, onClick, pendingIds, unreadIds }: {
+  inst: Instance;
+  isSelected: boolean;
+  onClick: () => void;
+  pendingIds: Set<string>;
+  unreadIds: Set<string>;
+}) {
+  return (
+    <button class="sidebar-item" aria-selected={isSelected} onClick={onClick}>
+      {inst.remote === "github" && <GitHubIcon />}
+      {inst.remote === "azuredevops" && <AzureDevOpsIcon />}
+      {inst.remote == null && <FolderIcon />}
+      {inst.name}
+      {pendingIds.has(inst.id) ? " (?)" : unreadIds.has(inst.id) ? " *" : ""}
+    </button>
+  );
+}
+
 export function InstanceList({ instances, selected, onSelect, onNew, onRemove, unreadIds, pendingIds }: Props) {
   const [collapsed, setCollapsed] = useState(!!selected);
   const selectedInst = instances.find((i) => i.id === selected);
 
+  if (collapsed && selectedInst) {
+    return (
+      <nav class="sidebar-section">
+        <InstanceButton
+          inst={selectedInst}
+          isSelected={true}
+          onClick={() => setCollapsed(false)}
+          pendingIds={pendingIds}
+          unreadIds={unreadIds}
+        />
+      </nav>
+    );
+  }
+
   return (
-    <nav class={`sidebar-section${collapsed ? "" : " sidebar-section--expanded"}`}>
-      <div class="sidebar-section-header">
-        <button class="btn btn-icon" onClick={() => setCollapsed((c) => !c)} aria-label={collapsed ? "Expand instances" : "Collapse instances"}>
-          {/* mdi:folder */}
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" width="20" height="20">
-            <path d="M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6H12L10,4Z" />
-          </svg>
-        </button>
-        <h2 class="sidebar-header">{collapsed ? (selectedInst?.name ?? "Instances") : "Instances"}</h2>
-      </div>
-      {!collapsed && (
-        <>
-          {instances.length === 0 && (
-            <div class="loading">No instances configured</div>
-          )}
-          {instances.map((inst) => (
-            <div key={inst.id} class="sidebar-item-row">
-              <button
-                class="sidebar-item"
-                aria-selected={inst.id === selected}
-                onClick={() => onSelect(inst.id)}
-              >
-                {inst.remote === "github" && <GitHubIcon />}{inst.remote === "azuredevops" && <AzureDevOpsIcon />}{inst.name}{pendingIds.has(inst.id) ? " (?)" : unreadIds.has(inst.id) ? " *" : ""}
-              </button>
-              <RemoveButton onRemove={() => onRemove(inst.id)} label={`Remove ${inst.name}`} />
-            </div>
-          ))}
-          <button class="sidebar-item sidebar-item--add" onClick={onNew}>+ Add Instance…</button>
-        </>
+    <nav class="sidebar-section sidebar-section--expanded">
+      <button
+        class="sidebar-section-header"
+        onClick={() => selected && setCollapsed(true)}
+        aria-label="Collapse instances"
+      >
+        <span class="sidebar-section-icon" aria-hidden="true"><FolderIcon /></span>
+        <h2 class="sidebar-header">Instances</h2>
+      </button>
+      {instances.length === 0 && (
+        <div class="loading">No instances configured</div>
       )}
+      {instances.map((inst) => (
+        <div key={inst.id} class="sidebar-item-row">
+          <InstanceButton
+            inst={inst}
+            isSelected={inst.id === selected}
+            onClick={() => { onSelect(inst.id); setCollapsed(true); }}
+            pendingIds={pendingIds}
+            unreadIds={unreadIds}
+          />
+          <RemoveButton onRemove={() => onRemove(inst.id)} label={`Remove ${inst.name}`} />
+        </div>
+      ))}
+      <button class="sidebar-item sidebar-item--add" onClick={onNew}>+ Add Instance…</button>
     </nav>
   );
 }
