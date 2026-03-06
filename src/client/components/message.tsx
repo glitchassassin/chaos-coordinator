@@ -28,6 +28,66 @@ function ThinkingBlock({ text, i }: { text: string; i: number }) {
   );
 }
 
+function BashToolView({ part, i }: { part: ToolPart; i: number }) {
+  const [expanded, setExpanded] = useState(false);
+  const { state } = part;
+  const command = (state.input?.command as string) || "";
+  const isRunning = state.status === "running" || state.status === "pending";
+  const outputLines = state.output ? state.output.split("\n") : [];
+  const collapsedOutput = outputLines.slice(0, 3).join("\n");
+  const errorLines = state.error ? state.error.split("\n") : [];
+  const errorFirstLine = errorLines[0] ?? "";
+  const errorCollapsed = errorLines.length > 1 ? errorFirstLine + "…" : errorFirstLine;
+  const isTruncated = outputLines.length > 3 || errorLines.length > 1;
+
+  return (
+    <div key={i} class="bash-tool">
+      {!isRunning && isTruncated && (
+        <button
+          class="bash-toggle"
+          onClick={() => setExpanded((e) => !e)}
+          aria-label={expanded ? "Collapse" : "Expand"}
+        >
+          {expanded ? (
+            // mdi:arrow-collapse-vertical
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+              <path d="M4,12H20V14H4V12M4,9H20V11H4V9M16,4L12,8L8,4H11V1H13V4H16M8,19L12,15L16,19H13V22H11V19H8Z" />
+            </svg>
+          ) : (
+            // mdi:arrow-expand-vertical
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+              <path d="M13,9V15H16L12,19L8,15H11V9H8L12,5L16,9H13M4,2H20V4H4V2M4,20H20V22H4V20Z" />
+            </svg>
+          )}
+        </button>
+      )}
+      <pre class="bash-tool-pre">
+        <span class="bash-cmd-line">
+          <span class="bash-prompt">&gt; </span>
+          <code
+            class="language-bash"
+            dangerouslySetInnerHTML={{ __html: highlight(command, "bash") }}
+          />
+          {isRunning && <span class="bash-running"> ...</span>}
+        </span>
+        {expanded ? (
+          <>
+            {state.output}
+            {state.error && (
+              <em class="bash-error">{"\n" + state.error}</em>
+            )}
+          </>
+        ) : (
+          <>
+            {collapsedOutput}
+            {state.error && <em class="bash-error">{"\n" + errorCollapsed}</em>}
+          </>
+        )}
+      </pre>
+    </div>
+  );
+}
+
 function ToolPartView({ part, i }: { part: ToolPart; i: number }) {
   const [expanded, setExpanded] = useState(false);
   const { tool, state } = part;
@@ -114,8 +174,11 @@ function renderPart(part: Part, i: number, role: string) {
           {part.text}
         </div>
       );
-    case "tool":
-      return <ToolPartView part={part as ToolPart} i={i} />;
+    case "tool": {
+      const tp = part as ToolPart;
+      if (tp.tool === "bash") return <BashToolView part={tp} i={i} />;
+      return <ToolPartView part={tp} i={i} />;
+    }
     case "reasoning":
       if (!("text" in part) || !part.text) return null;
       return <ThinkingBlock key={i} text={part.text as string} i={i} />;

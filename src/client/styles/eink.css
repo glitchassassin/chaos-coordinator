@@ -337,6 +337,66 @@ body {
   margin-top: 0.5rem;
 }
 
+.bash-tool {
+  margin: 0.5rem 0;
+  position: relative;
+}
+
+.bash-tool-pre {
+  border-left: 2px solid rgba(0, 0, 0, 0.5);
+  padding: 0.5rem;
+  overflow-x: auto;
+  margin: 0;
+  font-family: "Fira Code", ui-monospace, monospace;
+  font-size: 1rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.bash-cmd-line {
+  display: block;
+}
+
+.bash-prompt {
+  font-weight: 700;
+  user-select: none;
+}
+
+.bash-running {
+  font-style: italic;
+}
+
+.bash-toggle {
+  position: absolute;
+  top: 0;
+  right: 100%;
+  background: #fff;
+  color: #000;
+  border: none;
+  padding: 0.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.bash-toggle svg {
+  width: 1rem;
+  height: 1rem;
+  display: block;
+}
+
+.bash-toggle:focus {
+  outline: 2px solid #000;
+  outline-offset: 2px;
+}
+
+.bash-error {
+  font-style: italic;
+}
+
 .thinking-block {
   margin: 0.5rem 0;
 }
