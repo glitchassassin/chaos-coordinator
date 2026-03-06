@@ -237,7 +237,14 @@ export function Message({ role, parts, info, showRole }: Props) {
 
   return (
     <article class={`message message--${role}`}>
-      {showRole && <h3 class="message-role">{role}</h3>}
+      {showRole && (
+        <h3 class="message-role">
+          {role}
+          {role === "assistant" && info?.modelID && (
+            <span> ({info.modelID})</span>
+          )}
+        </h3>
+      )}
       {parts.map((p, i) => renderPart(p, i, role))}
       {msgError && <ApiErrorView error={msgError} />}
     </article>
