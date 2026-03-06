@@ -4,7 +4,8 @@ import { Message } from "./message.js";
 import { PermissionBanner } from "./permission-banner.js";
 import { QuestionBanner } from "./question-banner.js";
 import { useSSE } from "../hooks/use-sse.js";
-import type { MessageWithParts, Part, SSEEvent, MessageInfo, PermissionRequest, QuestionRequest } from "../types.js";
+import { ApiErrorView } from "./message.js";
+import type { ApiError, MessageWithParts, Part, SSEEvent, MessageInfo, PermissionRequest, QuestionRequest } from "../types.js";
 
 interface Props {
   instanceId: string;
@@ -15,6 +16,7 @@ interface Props {
 
 export function Chat({ instanceId, sessionId, initialMessages, setSending }: Props) {
   const [messages, setMessages] = useState<MessageWithParts[]>(initialMessages);
+  const [sessionErrors, setSessionErrors] = useState<Array<{ id: string; error: ApiError }>>([]);
   const [pendingPermissions, setPendingPermissions] = useState<PermissionRequest[]>([]);
   const [pendingQuestions, setPendingQuestions] = useState<QuestionRequest[]>([]);
   const chatRef = useRef<HTMLDivElement>(null);
@@ -22,6 +24,7 @@ export function Chat({ instanceId, sessionId, initialMessages, setSending }: Pro
   // Sync when parent passes new initial messages (session switch)
   useEffect(() => {
     setMessages(initialMessages);
+    setSessionErrors([]);
   }, [initialMessages]);
 
   // Fetch pending permissions on mount / session switch
@@ -155,6 +158,13 @@ export function Chat({ instanceId, sessionId, initialMessages, setSending }: Pro
         const { requestID } = props as { sessionID: string; requestID: string };
         setPendingQuestions((prev) => prev.filter((q) => q.id !== requestID));
       }
+
+      if (evt.type === "session.error") {
+        const { sessionID: sid, error } = props as { sessionID?: string; error: ApiError };
+        if (sid && sid !== sessionId) return;
+        setSending(false);
+        setSessionErrors((prev) => [...prev, { id: `${Date.now()}-${prev.length}`, error }]);
+      }
     },
     [sessionId],
   );
@@ -233,8 +243,14 @@ export function Chat({ instanceId, sessionId, initialMessages, setSending }: Pro
             key={m.info.id}
             role={m.info.role}
             parts={m.parts}
+            info={m.info}
             showRole={i === 0 || messages[i - 1].info.role !== m.info.role}
           />
+        ))}
+        {sessionErrors.map(({ id, error }) => (
+          <div key={id} class="session-error-entry">
+            <ApiErrorView error={error} />
+          </div>
         ))}
         <QuestionBanner questions={pendingQuestions} onReply={replyQuestion} onReject={rejectQuestion} />
       </div>

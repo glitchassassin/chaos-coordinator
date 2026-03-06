@@ -1,10 +1,11 @@
 import { marked, highlight } from "../util/highlight.js";
 import { useState } from "preact/hooks";
-import type { Part, ToolPart } from "../types.js";
+import type { ApiError, MessageInfo, Part, ToolPart } from "../types.js";
 
 interface Props {
   role: string;
   parts: Part[];
+  info?: MessageInfo;
   showRole?: boolean;
 }
 
@@ -166,6 +167,33 @@ function ToolPartView({ part, i }: { part: ToolPart; i: number }) {
   );
 }
 
+export function ApiErrorView({ error }: { error: ApiError }) {
+  const [expanded, setExpanded] = useState(false);
+  const message = (error.data?.message as string) || error.name;
+  const msgLines = message.split("\n");
+  const collapsedMsg = msgLines.length > 3 ? msgLines.slice(0, 3).join("\n") + "…" : message;
+  const isTruncated = msgLines.length > 3;
+
+  return (
+    <div class="api-error">
+      {isTruncated && (
+        <button
+          class="api-error-toggle"
+          onClick={() => setExpanded((e) => !e)}
+          aria-label={expanded ? "Collapse" : "Expand"}
+        >
+          {expanded ? <CollapseIcon /> : <ExpandIcon />}
+        </button>
+      )}
+      <pre class="api-error-pre">
+        <span class="api-error-name">error: {error.name}</span>
+        {"\n"}
+        <em>{expanded ? message : collapsedMsg}</em>
+      </pre>
+    </div>
+  );
+}
+
 function renderPart(part: Part, i: number, role: string) {
   switch (part.type) {
     case "text":
@@ -199,17 +227,19 @@ function renderPart(part: Part, i: number, role: string) {
   }
 }
 
-export function Message({ role, parts, showRole }: Props) {
-  // Skip messages with no visible parts
+export function Message({ role, parts, info, showRole }: Props) {
+  const msgError = info?.error as ApiError | undefined;
+  // Skip messages with no visible parts and no error
   const hasVisible = parts.some(
     (p) => p.type === "text" || p.type === "tool" || p.type === "reasoning",
   );
-  if (!hasVisible && parts.length > 0) return null;
+  if (!hasVisible && parts.length > 0 && !msgError) return null;
 
   return (
     <article class={`message message--${role}`}>
       {showRole && <h3 class="message-role">{role}</h3>}
       {parts.map((p, i) => renderPart(p, i, role))}
+      {msgError && <ApiErrorView error={msgError} />}
     </article>
   );
 }

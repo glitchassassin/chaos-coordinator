@@ -411,6 +411,54 @@ body {
   font-style: italic;
 }
 
+.api-error {
+  margin: 0.5rem 0;
+  position: relative;
+}
+
+.api-error-pre {
+  border-left: 2px solid #000;
+  padding: 0.5rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.api-error-name {
+  font-weight: bold;
+}
+
+.api-error-toggle {
+  position: absolute;
+  top: 0;
+  right: 100%;
+  background: #fff;
+  color: #000;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.api-error-toggle svg {
+  width: 1rem;
+  height: 1rem;
+  display: block;
+}
+
+.api-error-toggle:focus {
+  outline: 2px solid #000;
+  outline-offset: 2px;
+}
+
+.session-error-entry {
+  padding: 0 1rem;
+}
+
 .thinking-block {
   margin: 0.5rem 0;
   position: relative;

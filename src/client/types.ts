@@ -98,6 +98,12 @@ export interface PermissionRequest {
   tool?: { messageID: string; callID: string };
 }
 
+// API error shape from session.error events and message info
+export interface ApiError {
+  name: string;
+  data?: Record<string, unknown>;
+}
+
 // SSE event envelope
 export interface SSEEvent {
   type: string;
