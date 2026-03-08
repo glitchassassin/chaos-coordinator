@@ -192,6 +192,13 @@ app.get("/api/instances/:id/git/info", (c) => {
   return c.json({ branch, ahead, behind });
 });
 
+// Client config (whisper URL, etc.)
+app.get("/api/config", (c) => {
+  return c.json({
+    whisperUrl: process.env.WHISPER_URL || null,
+  });
+});
+
 // Reverse proxy to opencode instances
 app.route("/api/instances", proxy);
 

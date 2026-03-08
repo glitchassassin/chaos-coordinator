@@ -32,6 +32,9 @@ export function App() {
   const [sessionView, setSessionView] = useState<SessionView>("chat");
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [whisperUrl, setWhisperUrl] = useState<string | null>(null);
+  const [whisperAvailable, setWhisperAvailable] = useState(true);
+  const [recording, setRecording] = useState(false);
   // sessionId -> ModelKey for per-session model overrides
   const [sessionModels, setSessionModels] = useState<Map<string, ModelKey>>(() => new Map());
   const selectedModel = selectedSession ? (sessionModels.get(selectedSession) ?? null) : null;
@@ -48,6 +51,13 @@ export function App() {
   const cursorPosRef = useRef<number>(0);
   const draftRef = useRef<Map<string, string>>(new Map());
   const prevSessionRef = useRef<string | null>(selectedSession);
+  const wsRef = useRef<WebSocket | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  // Dictation model: ephemeral transcript is spliced into baseInput at insertPos
+  const baseInputRef = useRef("");
+  const insertPosRef = useRef(0);
+  const dictationTextRef = useRef("");
   useEffect(() => { selectedSessionRef.current = selectedSession; }, [selectedSession]);
   useEffect(() => { selectedInstanceRef.current = selectedInstance; }, [selectedInstance]);
 
@@ -78,6 +88,16 @@ export function App() {
   useEffect(() => {
     loadInstances();
   }, [loadInstances]);
+
+  // Fetch client config (whisper URL, etc.)
+  useEffect(() => {
+    fetch("/api/config")
+      .then((r) => r.ok ? r.json() : {})
+      .then((cfg: { whisperUrl?: string | null }) => {
+        setWhisperUrl(cfg.whisperUrl ?? null);
+      })
+      .catch(() => {});
+  }, []);
 
   // Persist selections
   useEffect(() => {
@@ -370,10 +390,171 @@ export function App() {
     [selectedInstance, ensureSession],
   );
 
+  // --- Dictation ---
+
+  // Close the current WS (without stopping the mic or recording state)
+  const closeWhisperWs = useCallback(() => {
+    if (wsRef.current) {
+      if (wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(new Blob()); // end-of-stream signal
+      }
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+  }, []);
+
+  // Open a fresh WS connection to WhisperLiveKit, streaming from the existing mic
+  const connectWhisper = useCallback(() => {
+    if (!whisperUrl || !mediaStreamRef.current) return;
+
+    // Tear down any existing recorder (keeps the mic stream alive)
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    closeWhisperWs();
+
+    const stream = mediaStreamRef.current;
+    const ws = new WebSocket(whisperUrl);
+    wsRef.current = ws;
+
+    ws.onmessage = (evt) => {
+      try {
+        const data = JSON.parse(evt.data);
+        const lines = Array.isArray(data.lines)
+          ? data.lines.map((l: { text: string }) => l.text).join("").trim()
+          : "";
+        const buffer = (data.buffer_transcription || "").trim();
+        const transcript = [lines, buffer].filter(Boolean).join(" ").trim();
+        // Only update when the transcript actually changes
+        if (transcript === dictationTextRef.current) return;
+        dictationTextRef.current = transcript;
+        // Splice ephemeral transcript into baseInput at the insertion point
+        const base = baseInputRef.current;
+        const pos = insertPosRef.current;
+        const before = base.slice(0, pos);
+        const after = base.slice(pos);
+        const sep = transcript && before.length > 0 && !before.endsWith(" ") ? " " : "";
+        const sepAfter = transcript && after.length > 0 && !after.startsWith(" ") ? " " : "";
+        setInput(before + sep + transcript + sepAfter + after);
+        // Restore cursor to end of the spliced dictation region
+        const cursorTarget = before.length + sep.length + transcript.length;
+        requestAnimationFrame(() => {
+          const el = textareaRef.current;
+          if (el && document.activeElement === el) {
+            el.setSelectionRange(cursorTarget, cursorTarget);
+          }
+        });
+      } catch {
+        // ignore non-JSON messages
+      }
+    };
+
+    ws.onopen = () => {
+      setWhisperAvailable(true);
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : "audio/webm";
+      const recorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = recorder;
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0 && ws.readyState === WebSocket.OPEN) {
+          ws.send(e.data);
+        }
+      };
+      recorder.start(250);
+    };
+
+    ws.onclose = () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+      }
+    };
+
+    ws.onerror = () => {
+      setWhisperAvailable(false);
+      stopDictation();
+    };
+  }, [whisperUrl]);
+
+  const stopDictation = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    closeWhisperWs();
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+      mediaStreamRef.current = null;
+    }
+    mediaRecorderRef.current = null;
+    dictationTextRef.current = "";
+    setRecording(false);
+  }, [closeWhisperWs]);
+
+  // Commit ephemeral dictation text and reconnect WS to reset the transcript
+  const commitDictation = useCallback(() => {
+    if (!recording || !dictationTextRef.current) return;
+    // The current input already has the spliced-in transcript — adopt it as the new base
+    const el = textareaRef.current;
+    const currentValue = el?.value ?? "";
+    const cursorPos = el?.selectionStart ?? currentValue.length;
+    baseInputRef.current = currentValue;
+    insertPosRef.current = cursorPos;
+    dictationTextRef.current = "";
+    connectWhisper();
+  }, [recording, connectWhisper]);
+
+  const handleDictation = useCallback(async () => {
+    if (recording) {
+      stopDictation();
+      return;
+    }
+
+    if (!whisperUrl) return;
+
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      return;
+    }
+    mediaStreamRef.current = stream;
+
+    // Snapshot current input and cursor position
+    const el = textareaRef.current;
+    baseInputRef.current = input;
+    insertPosRef.current = el?.selectionStart ?? input.length;
+    dictationTextRef.current = "";
+
+    setRecording(true);
+    connectWhisper();
+  }, [recording, whisperUrl, input, stopDictation, connectWhisper]);
+
+  // Cleanup dictation on unmount
+  useEffect(() => {
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+      }
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+      }
+    };
+  }, []);
+
+  // --- End dictation ---
+
   const handleSubmit = useCallback(async () => {
     const text = input.trim();
     if (!text || !selectedInstance) return;
     setInput("");
+    baseInputRef.current = "";
+    insertPosRef.current = 0;
+    dictationTextRef.current = "";
+    if (recording) connectWhisper(); // reconnect to reset transcript
     if (selectedSession) draftRef.current.delete(selectedSession);
     setSessionView("chat");
     if (text.startsWith("!")) {
@@ -381,7 +562,7 @@ export function App() {
     } else {
       await handleSendMessage(text);
     }
-  }, [input, selectedInstance, selectedSession, handleSendMessage, handleSendShell]);
+  }, [input, selectedInstance, selectedSession, handleSendMessage, handleSendShell, recording, connectWhisper]);
 
   const handleStop = useCallback(async () => {
     if (!selectedInstance || !selectedSession) return;
@@ -625,12 +806,46 @@ export function App() {
             <textarea
               ref={textareaRef}
               value={input}
-              onInput={(e) => setInput((e.target as HTMLTextAreaElement).value)}
-              onKeyDown={handleKeyDown}
+              onInput={(e) => {
+                const el = e.target as HTMLTextAreaElement;
+                setInput(el.value);
+                if (recording) {
+                  baseInputRef.current = el.value;
+                  insertPosRef.current = el.selectionStart ?? el.value.length;
+                }
+              }}
+              onKeyDown={(e) => { commitDictation(); handleKeyDown(e); }}
+              onPointerDown={commitDictation}
               onBlur={handleTextareaBlur}
               placeholder="Type a message..."
               rows={2}
             />
+            {whisperUrl && (
+              <button
+                type="button"
+                class={`btn btn-icon${recording ? " btn-icon--recording" : ""}`}
+                disabled={!whisperAvailable && !recording}
+                onClick={handleDictation}
+                aria-label={!whisperAvailable ? "Transcription unavailable" : recording ? "Stop recording" : "Start dictation"}
+              >
+                {!whisperAvailable ? (
+                  /* mdi:microphone-off — disabled/unreachable */
+                  <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M19,11C19,12.19 18.66,13.3 18.1,14.28L16.87,13.05C17.14,12.43 17.3,11.74 17.3,11H19M15,11.16L9,5.18V5A3,3 0 0,1 12,2A3,3 0 0,1 15,5V11L15,11.16M4.27,3L21,19.73L19.73,21L15.54,16.81C14.77,17.27 13.91,17.58 13,17.72V21H11V17.72C7.72,17.23 5,14.41 5,11H6.7C6.7,14 9.24,16.1 12,16.1C12.81,16.1 13.6,15.91 14.31,15.58L12.65,13.92L12,14A3,3 0 0,1 9,11V10.28L3,4.27L4.27,3Z" />
+                  </svg>
+                ) : recording ? (
+                  /* mdi:microphone-outline — recording active */
+                  <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M17,11C17,13.76 14.76,16 12,16C9.24,16 7,13.76 7,11H5C5,14.53 7.61,17.44 11,17.93V21H13V17.93C16.39,17.44 19,14.53 19,11M12,4A1,1 0 0,0 11,5V11A1,1 0 0,0 12,12A1,1 0 0,0 13,11V5A1,1 0 0,0 12,4M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2Z" />
+                  </svg>
+                ) : (
+                  /* mdi:microphone — idle/ready */
+                  <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z" />
+                  </svg>
+                )}
+              </button>
+            )}
             <button
               type="button"
               class="btn btn-icon"
