@@ -504,6 +504,11 @@ export function App() {
   }, [recording, connectWhisper]);
 
   const handleDictation = useCallback(async () => {
+    const el = textareaRef.current;
+    if (el) {
+      el.focus();
+    }
+
     if (recording) {
       stopDictation();
       return;
@@ -520,7 +525,6 @@ export function App() {
     mediaStreamRef.current = stream;
 
     // Snapshot current input and cursor position
-    const el = textareaRef.current;
     baseInputRef.current = input;
     insertPosRef.current = el?.selectionStart ?? input.length;
     dictationTextRef.current = "";
