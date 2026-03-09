@@ -1,6 +1,7 @@
 import { marked, highlight } from "../util/highlight.js";
 import { useState } from "preact/hooks";
 import type { ApiError, MessageInfo, Part, ToolPart } from "../types.js";
+import { DiffView } from "./diff-view.js";
 
 interface Props {
   role: string;
@@ -112,6 +113,19 @@ function ToolPartView({ part, i }: { part: ToolPart; i: number }) {
           ? " (error)"
           : "";
 
+  const filepath =
+    typeof state.metadata?.filepath === "string"
+      ? state.metadata.filepath
+      : (state.input?.filePath as string) || undefined;
+
+  // Use metadata diff if available; for write tools, synthesize an all-additions diff from content
+  let diff =
+    typeof state.metadata?.diff === "string" ? state.metadata.diff : null;
+  if (!diff && tool === "write" && typeof state.input?.content === "string") {
+    const lines = (state.input.content as string).split("\n");
+    diff = `@@ -0,0 +1,${lines.length} @@\n` + lines.map((l) => `+${l}`).join("\n");
+  }
+
   return (
     <div key={i} class="tool-block">
       <button
@@ -124,33 +138,39 @@ function ToolPartView({ part, i }: { part: ToolPart; i: number }) {
       <em>{title !== tool ? `${tool}: ${title}` : tool}{statusSuffix}</em>
       {expanded && (
         <div class="tool-content">
-          {state.input && (
+          {diff ? (
+            <DiffView diff={diff} filepath={filepath} defaultExpanded={true} />
+          ) : (
             <>
-              <div class="tool-section-label">input</div>
-              <pre class="language-json">
-                <code
-                  class="language-json"
-                  dangerouslySetInnerHTML={{
-                    __html: highlight(
-                      JSON.stringify(state.input, null, 2),
-                      "json",
-                    ),
-                  }}
-                />
-              </pre>
-            </>
-          )}
-          {state.output && (
-            <>
-              <div class="tool-section-label">output</div>
-              <pre class="language-markdown">
-                <code
-                  class="language-markdown"
-                  dangerouslySetInnerHTML={{
-                    __html: highlight(state.output, "markdown"),
-                  }}
-                />
-              </pre>
+              {state.input && (
+                <>
+                  <div class="tool-section-label">input</div>
+                  <pre class="language-json">
+                    <code
+                      class="language-json"
+                      dangerouslySetInnerHTML={{
+                        __html: highlight(
+                          JSON.stringify(state.input, null, 2),
+                          "json",
+                        ),
+                      }}
+                    />
+                  </pre>
+                </>
+              )}
+              {state.output && (
+                <>
+                  <div class="tool-section-label">output</div>
+                  <pre class="language-markdown">
+                    <code
+                      class="language-markdown"
+                      dangerouslySetInnerHTML={{
+                        __html: highlight(state.output, "markdown"),
+                      }}
+                    />
+                  </pre>
+                </>
+              )}
             </>
           )}
           {state.error && (

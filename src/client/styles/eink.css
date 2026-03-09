@@ -665,8 +665,7 @@ code[class*="language-"] {
 
 .permission-banner {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 0.75rem;
   padding: 0.75rem;
   border-bottom: 1px solid #000;
@@ -1346,6 +1345,62 @@ code[class*="language-"] {
 }
 
 .file-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* DiffView component — reusable diff display wrapper */
+.diff-view-wrap {
+  margin: 0.5rem 0;
+  border: 2px solid #000;
+}
+
+.diff-view-wrap .diff-view {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.diff-view-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5ch;
+  padding: 0.25rem 0.5rem;
+  border-bottom: 2px solid #000;
+  font-size: 18px;
+}
+
+.diff-view-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5em;
+  height: 1.5em;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.diff-view-toggle svg {
+  width: 1em;
+  height: 1em;
+}
+
+.diff-view-toggle:focus {
+  outline: 2px solid #000;
+  outline-offset: 2px;
+}
+
+.diff-view-toggle:active {
+  background: #000;
+  color: #fff;
+}
+
+.diff-view-filepath {
+  font-family: var(--font-mono);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

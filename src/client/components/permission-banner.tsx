@@ -1,4 +1,5 @@
 import type { PermissionRequest } from "../types.js";
+import { DiffView } from "./diff-view.js";
 
 interface Props {
   permissions: PermissionRequest[];
@@ -15,6 +16,14 @@ export function PermissionBanner({ permissions, onReply }: Props) {
           typeof perm.metadata?.description === "string"
             ? perm.metadata.description
             : null;
+        const diff =
+          typeof perm.metadata?.diff === "string"
+            ? perm.metadata.diff
+            : null;
+        const filepath =
+          typeof perm.metadata?.filepath === "string"
+            ? perm.metadata.filepath
+            : undefined;
 
         return (
           <div key={perm.id} class="permission-banner">
@@ -29,6 +38,9 @@ export function PermissionBanner({ permissions, onReply }: Props) {
                 <span class="permission-desc">{description}</span>
               )}
             </div>
+            {diff && (
+              <DiffView diff={diff} filepath={filepath} defaultExpanded={true} />
+            )}
             <div class="permission-actions">
               <button
                 class="btn btn-primary"
