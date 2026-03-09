@@ -505,9 +505,6 @@ export function App() {
 
   const handleDictation = useCallback(async () => {
     const el = textareaRef.current;
-    if (el) {
-      el.focus();
-    }
 
     if (recording) {
       stopDictation();
@@ -829,6 +826,7 @@ export function App() {
                 type="button"
                 class={`btn btn-icon${recording ? " btn-icon--recording" : ""}`}
                 disabled={!whisperAvailable && !recording}
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={handleDictation}
                 aria-label={!whisperAvailable ? "Transcription unavailable" : recording ? "Stop recording" : "Start dictation"}
               >
@@ -854,6 +852,7 @@ export function App() {
               type="button"
               class="btn btn-icon"
               disabled={!busy}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={handleStop}
               aria-label="Stop"
             >
@@ -861,7 +860,7 @@ export function App() {
                 <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M9,9H15V15H9" />
               </svg>
             </button>
-            <button type="submit" class="btn btn-icon" aria-label="Send">
+            <button type="submit" class="btn btn-icon" onMouseDown={(e) => e.preventDefault()} aria-label="Send">
               <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M15,20H9V12H4.16L12,4.16L19.84,12H15V20Z" />
               </svg>
