@@ -7,7 +7,7 @@ import { Explorer } from "./components/explorer.js";
 import { SessionSettings } from "./components/session-settings.js";
 import { DirectoryPicker } from "./components/directory-picker.js";
 import { useSSE } from "./hooks/use-sse.js";
-import type { Instance, Session, MessageWithParts, SSEEvent, ModelKey, SessionStatus } from "./types.js";
+import type { Instance, Session, MessageWithParts, SSEEvent, ModelKey, SessionStatus, MessageInfo, Part } from "./types.js";
 
 type View = "main" | "new-instance";
 type SessionView = "chat" | "git" | "explorer" | "settings";
@@ -302,6 +302,79 @@ export function App() {
             next.delete(requestID);
             return next;
           });
+        }
+      }
+
+      if (evt.type === "message.updated") {
+        const info = evt.properties.info as MessageInfo;
+        if (instanceId === selectedInstanceRef.current && info.sessionID === selectedSessionRef.current) {
+          setMessages((prev) => {
+            const idx = prev.findIndex((m) => m.info.id === info.id);
+            if (idx >= 0) {
+              const updated = [...prev];
+              updated[idx] = { ...updated[idx], info };
+              return updated;
+            }
+            if (info.role === "user") {
+              const withoutPending = prev.filter((m) => !m.info.id.startsWith("pending-"));
+              return [...withoutPending, { info, parts: [] }];
+            }
+            return [...prev, { info, parts: [] }];
+          });
+        }
+      }
+
+      if (evt.type === "message.part.updated") {
+        const part = evt.properties.part as Part;
+        if (instanceId === selectedInstanceRef.current && part.sessionID === selectedSessionRef.current) {
+          setMessages((prev) =>
+            prev.map((m) => {
+              if (m.info.id !== part.messageID) return m;
+              const parts = [...m.parts];
+              const idx = parts.findIndex((p) => p.id === part.id);
+              if (idx >= 0) {
+                parts[idx] = part;
+              } else {
+                parts.push(part);
+                parts.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+              }
+              return { ...m, parts };
+            }),
+          );
+        }
+      }
+
+      if (evt.type === "message.part.delta") {
+        const { sessionID, messageID, partID, delta } = evt.properties as {
+          sessionID: string;
+          messageID: string;
+          partID: string;
+          delta: string;
+        };
+        if (instanceId === selectedInstanceRef.current && sessionID === selectedSessionRef.current) {
+          setMessages((prev) =>
+            prev.map((m) => {
+              if (m.info.id !== messageID) return m;
+              const parts = m.parts.map((p) => {
+                if (p.id !== partID) return p;
+                if (p.type === "text") {
+                  return { ...p, text: (p.text || "") + delta };
+                }
+                return p;
+              });
+              return { ...m, parts };
+            }),
+          );
+        }
+      }
+
+      if (evt.type === "message.removed") {
+        const { sessionID, messageID } = evt.properties as {
+          sessionID: string;
+          messageID: string;
+        };
+        if (instanceId === selectedInstanceRef.current && sessionID === selectedSessionRef.current) {
+          setMessages((prev) => prev.filter((m) => m.info.id !== messageID));
         }
       }
 
@@ -843,7 +916,7 @@ export function App() {
           <Chat
             instanceId={selectedInstance}
             sessionId={selectedSession ?? ""}
-            initialMessages={selectedSession ? messages : []}
+            messages={selectedSession ? messages : []}
           />
         )}
         {selectedInstance && view !== "new-instance" && (

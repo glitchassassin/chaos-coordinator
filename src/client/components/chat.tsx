@@ -4,24 +4,18 @@ import { Message } from "./message.js";
 import { PermissionBanner } from "./permission-banner.js";
 import { QuestionBanner } from "./question-banner.js";
 import { useSSE } from "../hooks/use-sse.js";
-import type { MessageWithParts, Part, SSEEvent, MessageInfo, PermissionRequest, QuestionRequest } from "../types.js";
+import type { MessageWithParts, SSEEvent, PermissionRequest, QuestionRequest } from "../types.js";
 
 interface Props {
   instanceId: string;
   sessionId: string;
-  initialMessages: MessageWithParts[];
+  messages: MessageWithParts[];
 }
 
-export function Chat({ instanceId, sessionId, initialMessages }: Props) {
-  const [messages, setMessages] = useState<MessageWithParts[]>(initialMessages);
+export function Chat({ instanceId, sessionId, messages }: Props) {
   const [pendingPermissions, setPendingPermissions] = useState<PermissionRequest[]>([]);
   const [pendingQuestions, setPendingQuestions] = useState<QuestionRequest[]>([]);
   const chatRef = useRef<HTMLDivElement>(null);
-
-  // Sync when parent passes new initial messages (session switch)
-  useEffect(() => {
-    setMessages(initialMessages);
-  }, [initialMessages]);
 
   // Fetch pending permissions on mount / session switch
   useEffect(() => {
@@ -54,77 +48,6 @@ export function Chat({ instanceId, sessionId, initialMessages }: Props) {
   const handleEvent = useCallback(
     (evt: SSEEvent, _instanceId: string) => {
       const props = evt.properties;
-
-      if (evt.type === "message.updated") {
-        const info = props.info as MessageInfo;
-        if (info.sessionID !== sessionId) return;
-        setMessages((prev) => {
-          const idx = prev.findIndex((m) => m.info.id === info.id);
-          if (idx >= 0) {
-            const updated = [...prev];
-            updated[idx] = { ...updated[idx], info };
-            return updated;
-          }
-          // New message — drop any optimistic placeholder for this role
-          if (info.role === "user") {
-            const without = prev.filter((m) => !m.info.id.startsWith("pending-"));
-            return [...without, { info, parts: [] }];
-          }
-          return [...prev, { info, parts: [] }];
-        });
-      }
-
-      if (evt.type === "message.part.updated") {
-        const part = props.part as Part;
-        if (part.sessionID !== sessionId) return;
-        setMessages((prev) =>
-          prev.map((m) => {
-            if (m.info.id !== part.messageID) return m;
-            const parts = [...m.parts];
-            const idx = parts.findIndex((p) => p.id === part.id);
-            if (idx >= 0) {
-              parts[idx] = part;
-            } else {
-              parts.push(part);
-              parts.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-            }
-            return { ...m, parts };
-          }),
-        );
-      }
-
-      if (evt.type === "message.part.delta") {
-        const { sessionID, messageID, partID, delta } = props as {
-          sessionID: string;
-          messageID: string;
-          partID: string;
-          field: string;
-          delta: string;
-        };
-        if (sessionID !== sessionId) return;
-        setMessages((prev) =>
-          prev.map((m) => {
-            if (m.info.id !== messageID) return m;
-            const parts = m.parts.map((p) => {
-              if (p.id !== partID) return p;
-              if (p.type === "text") {
-                return { ...p, text: (p.text || "") + delta };
-              }
-              return p;
-            });
-            return { ...m, parts };
-          }),
-        );
-      }
-
-      if (evt.type === "message.removed") {
-        const { sessionID, messageID } = props as {
-          sessionID: string;
-          messageID: string;
-        };
-        if (sessionID !== sessionId) return;
-        setMessages((prev) => prev.filter((m) => m.info.id !== messageID));
-      }
 
       if (evt.type === "permission.asked") {
         const perm = props as unknown as PermissionRequest;
