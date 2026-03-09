@@ -849,14 +849,35 @@ code[class*="language-"] {
 .input-area {
   border-top: 2px solid rgba(0, 0, 0, 0.5);
   padding: 0.75rem;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.input-area-controls {
   display: flex;
   gap: 0.5rem;
+}
+
+.mention-insert-btn {
+  min-height: 44px;
+}
+
+.mention-insert-btn--floating {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 1;
+  transform: translateY(-100%);
+  background: #000;
+  color: #fff;
 }
 
 .input-area textarea {
   flex: 1;
   font-family: inherit;
-  font-size: 1rem;
+  font-size: var(--text-body);
   padding: 0.5rem;
   border: none;
   background: #fff;
@@ -1224,12 +1245,6 @@ code[class*="language-"] {
 .explorer-file-scroll code {
   font-family: "Fira Code", ui-monospace, monospace;
   font-size: 1rem;
-}
-
-.file-mention-btn {
-  padding: 0.25rem;
-  line-height: 0;
-  z-index: 100;
 }
 
 .panel-header {

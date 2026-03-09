@@ -6,7 +6,7 @@ import type { FileStatus, FileContent } from "../types.js";
 
 interface Props {
   instanceId: string;
-  onInsertMention?: (filePath: string, startLine: number, endLine: number) => void;
+  onMentionTargetChange?: (target: { filePath: string; startLine: number; endLine: number } | null) => void;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -21,14 +21,14 @@ interface GitInfo {
   behind: number;
 }
 
-export function GitStatus({ instanceId, onInsertMention }: Props) {
+export function GitStatus({ instanceId, onMentionTargetChange }: Props) {
   const [files, setFiles] = useState<FileStatus[]>([]);
   const [gitInfo, setGitInfo] = useState<GitInfo | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [diffLines, setDiffLines] = useState<DiffLine[] | null>(null);
   const [highlightedHtml, setHighlightedHtml] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectionInfo, setSelectionInfo] = useState<{ rect: DOMRect; startLine: number; endLine: number } | null>(null);
+  const [selectionInfo, setSelectionInfo] = useState<{ startLine: number; endLine: number } | null>(null);
   const diffScrollRef = useRef<HTMLDivElement | null>(null);
 
   const loadFiles = useCallback(() => {
@@ -113,7 +113,7 @@ export function GitStatus({ instanceId, onInsertMention }: Props) {
         const startLine = getLineNumber(range.startContainer);
         const endLine = getLineNumber(range.endContainer);
         if (startLine !== null && endLine !== null) {
-          setSelectionInfo({ rect: range.getBoundingClientRect(), startLine, endLine });
+          setSelectionInfo({ startLine, endLine });
           return;
         }
       }
@@ -122,6 +122,20 @@ export function GitStatus({ instanceId, onInsertMention }: Props) {
     document.addEventListener("selectionchange", handleSelectionChange);
     return () => document.removeEventListener("selectionchange", handleSelectionChange);
   }, [getLineNumber]);
+
+  useEffect(() => {
+    if (selectionInfo && selected) {
+      onMentionTargetChange?.({
+        filePath: selected,
+        startLine: selectionInfo.startLine,
+        endLine: selectionInfo.endLine,
+      });
+      return;
+    }
+    onMentionTargetChange?.(null);
+  }, [onMentionTargetChange, selected, selectionInfo]);
+
+  useEffect(() => () => onMentionTargetChange?.(null), [onMentionTargetChange]);
 
   if (selected && diffLines !== null) {
     return (
@@ -148,24 +162,6 @@ export function GitStatus({ instanceId, onInsertMention }: Props) {
             </code>
           </pre>
         </div>
-        {selectionInfo && onInsertMention && (
-          <button
-            class="btn file-mention-btn"
-            style={`position: fixed; top: ${selectionInfo.rect.top - 4}px; left: ${diffScrollRef.current?.querySelector(".diff-line > span:last-child")?.getBoundingClientRect().left ?? selectionInfo.rect.left}px; transform: translateY(-100%);`}
-            onPointerDown={(e) => e.preventDefault()}
-            onClick={() => {
-              onInsertMention(selected!, selectionInfo.startLine, selectionInfo.endLine);
-              setSelectionInfo(null);
-              window.getSelection()?.removeAllRanges();
-            }}
-            aria-label="Insert file mention"
-          >
-            {/* mdi:arrow-down-bold */}
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M9,4H15V12H19.84L12,19.84L4.16,12H9V4Z" />
-            </svg>
-          </button>
-        )}
       </div>
     );
   }

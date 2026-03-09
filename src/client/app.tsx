@@ -12,6 +12,12 @@ import type { Instance, Session, MessageWithParts, SSEEvent, ModelKey, SessionSt
 type View = "main" | "new-instance";
 type SessionView = "chat" | "git" | "explorer" | "settings";
 
+interface MentionTarget {
+  filePath: string;
+  startLine: number;
+  endLine: number;
+}
+
 function apiUrl(instanceId: string, path: string): string {
   return `/api/instances/${instanceId}${path}`;
 }
@@ -41,6 +47,7 @@ export function App() {
   const [view, setView] = useState<View>("main");
   const [sessionView, setSessionView] = useState<SessionView>("chat");
   const [input, setInput] = useState("");
+  const [mentionTarget, setMentionTarget] = useState<MentionTarget | null>(null);
   const [busy, setBusy] = useState(false);
   const [whisperUrl, setWhisperUrl] = useState<string | null>(null);
   const [whisperAvailable, setWhisperAvailable] = useState(true);
@@ -641,6 +648,13 @@ export function App() {
     }, 0);
   }, [instances, selectedInstance]);
 
+  const handleInsertSelectedMention = useCallback(() => {
+    if (!mentionTarget) return;
+    handleInsertMention(mentionTarget.filePath, mentionTarget.startLine, mentionTarget.endLine);
+    setMentionTarget(null);
+    window.getSelection()?.removeAllRanges();
+  }, [handleInsertMention, mentionTarget]);
+
   const handleNewInstance = useCallback(() => {
     setView("new-instance");
   }, []);
@@ -816,9 +830,9 @@ export function App() {
         ) : !selectedInstance ? (
           <div class="empty-state">Select an instance to get started.</div>
         ) : sessionView === "git" ? (
-          <GitStatus instanceId={selectedInstance} onInsertMention={handleInsertMention} />
+          <GitStatus instanceId={selectedInstance} onMentionTargetChange={setMentionTarget} />
         ) : sessionView === "explorer" ? (
-          <Explorer instanceId={selectedInstance} rootPath={instances.find((i) => i.id === selectedInstance)?.directory || "/"} onInsertMention={handleInsertMention} />
+          <Explorer rootPath={instances.find((i) => i.id === selectedInstance)?.directory || "/"} onMentionTargetChange={setMentionTarget} />
         ) : sessionView === "settings" ? (
           <SessionSettings
             instanceId={selectedInstance}
@@ -834,67 +848,82 @@ export function App() {
         )}
         {selectedInstance && view !== "new-instance" && (
           <form class="input-area" onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onInput={(e) => {
-                const el = e.target as HTMLTextAreaElement;
-                setInput(el.value);
-                if (recording) {
-                  baseInputRef.current = el.value;
-                  insertPosRef.current = el.selectionStart ?? el.value.length;
-                }
-              }}
-              onKeyDown={(e) => { commitDictation(); handleKeyDown(e); }}
-              onPointerDown={commitDictation}
-              onBlur={handleTextareaBlur}
-              placeholder="Type a message..."
-              rows={2}
-            />
-            {whisperUrl && (
+            {mentionTarget && (
               <button
                 type="button"
-                class={`btn btn-icon${recording ? " btn-icon--recording" : ""}`}
-                disabled={!whisperAvailable && !recording}
+                class="btn btn-icon mention-insert-btn mention-insert-btn--floating"
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={handleDictation}
-                aria-label={!whisperAvailable ? "Transcription unavailable" : recording ? "Stop recording" : "Start dictation"}
+                onClick={handleInsertSelectedMention}
+                aria-label="Insert selected lines"
               >
-                {!whisperAvailable ? (
-                  /* mdi:microphone-off — disabled/unreachable */
-                  <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <path d="M19,11C19,12.19 18.66,13.3 18.1,14.28L16.87,13.05C17.14,12.43 17.3,11.74 17.3,11H19M15,11.16L9,5.18V5A3,3 0 0,1 12,2A3,3 0 0,1 15,5V11L15,11.16M4.27,3L21,19.73L19.73,21L15.54,16.81C14.77,17.27 13.91,17.58 13,17.72V21H11V17.72C7.72,17.23 5,14.41 5,11H6.7C6.7,14 9.24,16.1 12,16.1C12.81,16.1 13.6,15.91 14.31,15.58L12.65,13.92L12,14A3,3 0 0,1 9,11V10.28L3,4.27L4.27,3Z" />
-                  </svg>
-                ) : recording ? (
-                  /* mdi:microphone-outline — recording active */
-                  <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <path d="M17,11C17,13.76 14.76,16 12,16C9.24,16 7,13.76 7,11H5C5,14.53 7.61,17.44 11,17.93V21H13V17.93C16.39,17.44 19,14.53 19,11M12,4A1,1 0 0,0 11,5V11A1,1 0 0,0 12,12A1,1 0 0,0 13,11V5A1,1 0 0,0 12,4M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2Z" />
-                  </svg>
-                ) : (
-                  /* mdi:microphone — idle/ready */
-                  <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <path d="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z" />
-                  </svg>
-                )}
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M9,4H15V12H19.84L12,19.84L4.16,12H9V4Z" />
+                </svg>
               </button>
             )}
-            <button
-              type="button"
-              class="btn btn-icon"
-              disabled={!busy}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={handleStop}
-              aria-label="Stop"
-            >
-              <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M9,9H15V15H9" />
-              </svg>
-            </button>
-            <button type="submit" class="btn btn-icon" onMouseDown={(e) => e.preventDefault()} aria-label="Send">
-              <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M15,20H9V12H4.16L12,4.16L19.84,12H15V20Z" />
-              </svg>
-            </button>
+            <div class="input-area-controls">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onInput={(e) => {
+                  const el = e.target as HTMLTextAreaElement;
+                  setInput(el.value);
+                  if (recording) {
+                    baseInputRef.current = el.value;
+                    insertPosRef.current = el.selectionStart ?? el.value.length;
+                  }
+                }}
+                onKeyDown={(e) => { commitDictation(); handleKeyDown(e); }}
+                onPointerDown={commitDictation}
+                onBlur={handleTextareaBlur}
+                placeholder="Type a message..."
+                rows={2}
+              />
+              {whisperUrl && (
+                <button
+                  type="button"
+                  class={`btn btn-icon${recording ? " btn-icon--recording" : ""}`}
+                  disabled={!whisperAvailable && !recording}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={handleDictation}
+                  aria-label={!whisperAvailable ? "Transcription unavailable" : recording ? "Stop recording" : "Start dictation"}
+                >
+                  {!whisperAvailable ? (
+                    /* mdi:microphone-off — disabled/unreachable */
+                    <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M19,11C19,12.19 18.66,13.3 18.1,14.28L16.87,13.05C17.14,12.43 17.3,11.74 17.3,11H19M15,11.16L9,5.18V5A3,3 0 0,1 12,2A3,3 0 0,1 15,5V11L15,11.16M4.27,3L21,19.73L19.73,21L15.54,16.81C14.77,17.27 13.91,17.58 13,17.72V21H11V17.72C7.72,17.23 5,14.41 5,11H6.7C6.7,14 9.24,16.1 12,16.1C12.81,16.1 13.6,15.91 14.31,15.58L12.65,13.92L12,14A3,3 0 0,1 9,11V10.28L3,4.27L4.27,3Z" />
+                    </svg>
+                  ) : recording ? (
+                    /* mdi:microphone-outline — recording active */
+                    <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M17,11C17,13.76 14.76,16 12,16C9.24,16 7,13.76 7,11H5C5,14.53 7.61,17.44 11,17.93V21H13V17.93C16.39,17.44 19,14.53 19,11M12,4A1,1 0 0,0 11,5V11A1,1 0 0,0 12,12A1,1 0 0,0 13,11V5A1,1 0 0,0 12,4M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2Z" />
+                    </svg>
+                  ) : (
+                    /* mdi:microphone — idle/ready */
+                    <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z" />
+                    </svg>
+                  )}
+                </button>
+              )}
+              <button
+                type="button"
+                class="btn btn-icon"
+                disabled={!busy}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={handleStop}
+                aria-label="Stop"
+              >
+                <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M9,9H15V15H9" />
+                </svg>
+              </button>
+              <button type="submit" class="btn btn-icon" onMouseDown={(e) => e.preventDefault()} aria-label="Send">
+                <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M15,20H9V12H4.16L12,4.16L19.84,12H15V20Z" />
+                </svg>
+              </button>
+            </div>
           </form>
         )}
       </main>
