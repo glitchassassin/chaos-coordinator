@@ -11,6 +11,7 @@ export interface Instance {
 export interface Session {
   id: string;
   title?: string;
+  directory?: string;
   time?: { created?: number; updated?: number; archived?: number };
 }
 

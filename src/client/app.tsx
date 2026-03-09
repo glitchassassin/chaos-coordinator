@@ -16,6 +16,16 @@ function apiUrl(instanceId: string, path: string): string {
   return `/api/instances/${instanceId}${path}`;
 }
 
+function matchesInstanceDirectory(session: Session, instanceDirectory: string): boolean {
+  if (!instanceDirectory) return true;
+  if (!session.directory) return true;
+  return session.directory === instanceDirectory;
+}
+
+function unreadSessionKey(instanceId: string, sessionId: string): string {
+  return `${instanceId}:${sessionId}`;
+}
+
 export function App() {
   const [instances, setInstances] = useState<Instance[]>([]);
   const [selectedInstance, setSelectedInstance] = useState<string | null>(
@@ -38,13 +48,14 @@ export function App() {
   // sessionId -> ModelKey for per-session model overrides
   const [sessionModels, setSessionModels] = useState<Map<string, ModelKey>>(() => new Map());
   const selectedModel = selectedSession ? (sessionModels.get(selectedSession) ?? null) : null;
-  // sessionId -> instanceId for unread tracking (default: all read on open)
-  const [unreadSessions, setUnreadSessions] = useState<Map<string, string>>(() => new Map());
+  // instanceId:sessionId -> { sessionId, instanceId } for unread tracking
+  const [unreadSessions, setUnreadSessions] = useState<Map<string, { sessionId: string; instanceId: string }>>(() => new Map());
   // requestId -> { sessionId, instanceId } for pending permission tracking
   const [pendingPermissions, setPendingPermissions] = useState<Map<string, { sessionId: string; instanceId: string }>>(() => new Map());
 
   const selectedSessionRef = useRef<string | null>(selectedSession);
   const selectedInstanceRef = useRef<string | null>(selectedInstance);
+  const instancesRef = useRef<Instance[]>(instances);
   const sessionRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messageRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -60,6 +71,7 @@ export function App() {
   const dictationTextRef = useRef("");
   useEffect(() => { selectedSessionRef.current = selectedSession; }, [selectedSession]);
   useEffect(() => { selectedInstanceRef.current = selectedInstance; }, [selectedInstance]);
+  useEffect(() => { instancesRef.current = instances; }, [instances]);
 
   const loadInstances = useCallback(() => {
     fetch("/api/instances")
@@ -118,15 +130,17 @@ export function App() {
     if (selectedSession) {
       sessionStorage.setItem("selectedSession", selectedSession);
       setUnreadSessions((prev) => {
-        if (!prev.has(selectedSession)) return prev;
+        if (!selectedInstance) return prev;
+        const key = unreadSessionKey(selectedInstance, selectedSession);
+        if (!prev.has(key)) return prev;
         const next = new Map(prev);
-        next.delete(selectedSession);
+        next.delete(key);
         return next;
       });
     } else {
       sessionStorage.removeItem("selectedSession");
     }
-  }, [selectedSession]);
+  }, [selectedSession, selectedInstance]);
 
   // Load sessions when instance changes
   useEffect(() => {
@@ -162,9 +176,12 @@ export function App() {
           const list: Session[] = Array.isArray(data)
             ? data
             : Object.values(data || {});
-          setSessions(list);
+          const selected = instances.find((i) => i.id === selectedInstance);
+          const instanceDirectory = selected?.directory ?? "";
+          const filtered = list.filter((s) => matchesInstanceDirectory(s, instanceDirectory));
+          setSessions(filtered);
           setSelectedSession((prev) =>
-            prev && list.some((s) => s.id === prev) ? prev : null
+            prev && filtered.some((s) => s.id === prev) ? prev : null
           );
           setSessionsLoading(false);
         })
@@ -208,7 +225,7 @@ export function App() {
         sessionRetryRef.current = null;
       }
     };
-  }, [selectedInstance]);
+  }, [selectedInstance, instances]);
 
   // Listen for session updates via SSE for all instances
   const handleSessionEvent = useCallback(
@@ -216,6 +233,8 @@ export function App() {
       if (evt.type === "session.updated" || evt.type === "session.created") {
         const info = evt.properties.info as Session;
         if (info && info.id) {
+          const instanceDirectory = instancesRef.current.find((i) => i.id === instanceId)?.directory ?? "";
+          if (!matchesInstanceDirectory(info, instanceDirectory)) return;
           // Only update sessions state if event is from the currently selected instance
           if (instanceId === selectedInstanceRef.current) {
             setSessions((prev) => {
@@ -231,8 +250,9 @@ export function App() {
           // Mark unread if this isn't the currently open session
           if (info.id !== selectedSessionRef.current) {
             setUnreadSessions((prev) => {
+              const key = unreadSessionKey(instanceId, info.id);
               const next = new Map(prev);
-              next.set(info.id, instanceId);
+              next.set(key, { sessionId: info.id, instanceId });
               return next;
             });
           }
@@ -245,9 +265,10 @@ export function App() {
             setSessions((prev) => prev.filter((s) => s.id !== info.id));
           }
           setUnreadSessions((prev) => {
-            if (!prev.has(info.id)) return prev;
+            const key = unreadSessionKey(instanceId, info.id);
+            if (!prev.has(key)) return prev;
             const next = new Map(prev);
-            next.delete(info.id);
+            next.delete(key);
             return next;
           });
         }
@@ -312,9 +333,9 @@ export function App() {
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
           return r.json();
         })
-        .then((data: MessageWithParts[]) => {
+        .then((data: MessageWithParts[] | Record<string, MessageWithParts>) => {
           if (cancelled) return;
-          const list = Array.isArray(data) ? data : Object.values(data || {});
+          const list: MessageWithParts[] = Array.isArray(data) ? data : Object.values(data || {});
           setMessages(list);
         })
         .catch((e) => {
@@ -673,9 +694,17 @@ export function App() {
     instances.find((i) => i.id === selectedInstance)?.name || "";
 
   const hasActivity = unreadSessions.size > 0 || pendingPermissions.size > 0;
-  const unreadSessionIds = new Set(unreadSessions.keys());
-  const unreadInstanceIds = new Set(unreadSessions.values());
-  const pendingSessionIds = new Set([...pendingPermissions.values()].map((v) => v.sessionId));
+  const unreadSessionIds = new Set(
+    [...unreadSessions.values()]
+      .filter((v) => v.instanceId === selectedInstance)
+      .map((v) => v.sessionId),
+  );
+  const unreadInstanceIds = new Set([...unreadSessions.values()].map((v) => v.instanceId));
+  const pendingSessionIds = new Set(
+    [...pendingPermissions.values()]
+      .filter((v) => v.instanceId === selectedInstance)
+      .map((v) => v.sessionId),
+  );
   const pendingInstanceIds = new Set([...pendingPermissions.values()].map((v) => v.instanceId));
 
   const sortedSessions = [...sessions].sort((a, b) => {
@@ -696,6 +725,7 @@ export function App() {
             onRemove={handleRemoveInstance}
             unreadIds={unreadInstanceIds}
             pendingIds={pendingInstanceIds}
+            hasActivity={hasActivity}
           />
           {selectedInstance && (
             <SessionList

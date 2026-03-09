@@ -1,4 +1,5 @@
 import { useState } from "preact/hooks";
+import type { JSX } from "preact";
 import { useDoubleCheck } from "../hooks/use-double-check.js";
 
 function GitHubIcon() {
@@ -42,15 +43,17 @@ interface Props {
   onRemove: (id: string) => void;
   unreadIds: Set<string>;
   pendingIds: Set<string>;
+  hasActivity: boolean;
 }
 
 function RemoveButton({ onRemove, label }: { onRemove: () => void; label: string }) {
   const { pending, getButtonProps } = useDoubleCheck();
+  const buttonProps = getButtonProps({ onClick: pending ? onRemove : undefined }) as JSX.HTMLAttributes<HTMLButtonElement>;
   return (
     <button
       class={`sidebar-item-remove${pending ? " sidebar-item-remove--confirm" : ""}`}
       aria-label={pending ? "Confirm remove" : label}
-      {...getButtonProps({ onClick: pending ? onRemove : undefined })}
+      {...buttonProps}
     >
       {pending ? (
         /* mdi:check-circle */
@@ -74,30 +77,58 @@ function InstanceButton({ inst, isSelected, onClick, pendingIds, unreadIds }: {
   pendingIds: Set<string>;
   unreadIds: Set<string>;
 }) {
+  const suffix = pendingIds.has(inst.id)
+    ? " (?)"
+    : unreadIds.has(inst.id)
+      ? " *"
+      : "";
   return (
     <button class="sidebar-item" aria-selected={isSelected} onClick={onClick}>
       {inst.remote === "github" && <GitHubIcon />}
       {inst.remote === "azuredevops" && <AzureDevOpsIcon />}
       {inst.remote == null && <FolderIcon />}
       {inst.name}
-      {pendingIds.has(inst.id) ? " (?)" : unreadIds.has(inst.id) ? " *" : ""}
+      {suffix}
     </button>
   );
 }
 
-export function InstanceList({ instances, selected, onSelect, onNew, onRemove, unreadIds, pendingIds }: Props) {
+function CollapsedInstanceButton({ inst, onClick, pendingIds, unreadIds, hasActivity }: {
+  inst: Instance;
+  onClick: () => void;
+  pendingIds: Set<string>;
+  unreadIds: Set<string>;
+  hasActivity: boolean;
+}) {
+  const suffix = pendingIds.has(inst.id)
+    ? " (?)"
+    : unreadIds.has(inst.id) || hasActivity
+      ? " *"
+      : "";
+  return (
+    <button class="sidebar-item" aria-selected={true} onClick={onClick}>
+      {inst.remote === "github" && <GitHubIcon />}
+      {inst.remote === "azuredevops" && <AzureDevOpsIcon />}
+      {inst.remote == null && <FolderIcon />}
+      {inst.name}
+      {suffix}
+    </button>
+  );
+}
+
+export function InstanceList({ instances, selected, onSelect, onNew, onRemove, unreadIds, pendingIds, hasActivity }: Props) {
   const [collapsed, setCollapsed] = useState(!!selected);
   const selectedInst = instances.find((i) => i.id === selected);
 
   if (collapsed && selectedInst) {
     return (
       <nav class="sidebar-section">
-        <InstanceButton
+        <CollapsedInstanceButton
           inst={selectedInst}
-          isSelected={true}
           onClick={() => setCollapsed(false)}
           pendingIds={pendingIds}
           unreadIds={unreadIds}
+          hasActivity={hasActivity}
         />
       </nav>
     );
