@@ -7,7 +7,7 @@ import { Explorer } from "./components/explorer.js";
 import { SessionSettings } from "./components/session-settings.js";
 import { DirectoryPicker } from "./components/directory-picker.js";
 import { useSSE } from "./hooks/use-sse.js";
-import type { Instance, Session, MessageWithParts, SSEEvent, ModelKey, SessionStatus, MessageInfo, Part } from "./types.js";
+import type { Instance, Session, MessageWithParts, SSEEvent, ModelKey, SessionStatus, MessageInfo, Part, AgentInfo } from "./types.js";
 
 type View = "main" | "new-instance";
 type SessionView = "chat" | "git" | "explorer" | "settings";
@@ -55,10 +55,16 @@ export function App() {
   // sessionId -> ModelKey for per-session model overrides
   const [sessionModels, setSessionModels] = useState<Map<string, ModelKey>>(() => new Map());
   const selectedModel = selectedSession ? (sessionModels.get(selectedSession) ?? null) : null;
+  // instanceId -> available primary-visible agents for switching
+  const [instanceAgents, setInstanceAgents] = useState<Map<string, AgentInfo[]>>(() => new Map());
+  // sessionId -> selected agent override
+  const [sessionAgents, setSessionAgents] = useState<Map<string, string>>(() => new Map());
+  const selectedAgent = selectedSession ? (sessionAgents.get(selectedSession) ?? null) : null;
   // instanceId:sessionId -> { sessionId, instanceId } for unread tracking
   const [unreadSessions, setUnreadSessions] = useState<Map<string, { sessionId: string; instanceId: string }>>(() => new Map());
   // requestId -> { sessionId, instanceId } for pending permission tracking
   const [pendingPermissions, setPendingPermissions] = useState<Map<string, { sessionId: string; instanceId: string }>>(() => new Map());
+  const [agentMenuOpen, setAgentMenuOpen] = useState(false);
 
   const selectedSessionRef = useRef<string | null>(selectedSession);
   const selectedInstanceRef = useRef<string | null>(selectedInstance);
@@ -66,6 +72,7 @@ export function App() {
   const sessionRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messageRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const agentMenuRef = useRef<HTMLDivElement | null>(null);
   const cursorPosRef = useRef<number>(0);
   const draftRef = useRef<Map<string, string>>(new Map());
   const prevSessionRef = useRef<string | null>(selectedSession);
@@ -79,6 +86,11 @@ export function App() {
   useEffect(() => { selectedSessionRef.current = selectedSession; }, [selectedSession]);
   useEffect(() => { selectedInstanceRef.current = selectedInstance; }, [selectedInstance]);
   useEffect(() => { instancesRef.current = instances; }, [instances]);
+
+  const availableAgents = selectedInstance ? (instanceAgents.get(selectedInstance) ?? []) : [];
+  const defaultAgent = availableAgents[0]?.name ?? "build";
+  const effectiveAgent = selectedAgent ?? defaultAgent;
+  const currentAgentLabel = selectedAgent ? selectedAgent : `Default (${defaultAgent})`;
 
   const loadInstances = useCallback(() => {
     fetch("/api/instances")
@@ -126,6 +138,7 @@ export function App() {
 
   useEffect(() => {
     setBusy(false);
+    setAgentMenuOpen(false);
     setSessionView("chat");
     // Save draft for the session we're leaving, restore for the one we're entering
     const prevSession = prevSessionRef.current;
@@ -149,11 +162,23 @@ export function App() {
     }
   }, [selectedSession, selectedInstance]);
 
+  useEffect(() => {
+    if (!agentMenuOpen) return;
+    const handlePointerDown = (evt: PointerEvent) => {
+      if (!agentMenuRef.current?.contains(evt.target as Node)) {
+        setAgentMenuOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [agentMenuOpen]);
+
   // Load sessions when instance changes
   useEffect(() => {
     if (!selectedInstance) {
       setSessions([]);
       setSelectedSession(null);
+      setAgentMenuOpen(false);
       setPendingPermissions((prev) => {
         if (prev.size === 0) return prev;
         return new Map();
@@ -233,6 +258,53 @@ export function App() {
       }
     };
   }, [selectedInstance, instances]);
+
+  useEffect(() => {
+    if (!selectedInstance) {
+      setInstanceAgents((prev) => {
+        if (prev.size === 0) return prev;
+        return new Map();
+      });
+      return;
+    }
+
+    let cancelled = false;
+    fetch(apiUrl(selectedInstance, "/agent"))
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: AgentInfo[]) => {
+        if (cancelled) return;
+        const visible = (Array.isArray(data) ? data : []).filter(
+          (agent) => agent.hidden !== true && agent.mode !== "subagent",
+        );
+        setInstanceAgents((prev) => {
+          const next = new Map(prev);
+          next.set(selectedInstance, visible);
+          return next;
+        });
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedInstance]);
+
+  useEffect(() => {
+    const names = new Set(availableAgents.map((agent) => agent.name));
+    if (names.size === 0 || sessions.length === 0) return;
+    setSessionAgents((prev) => {
+      let changed = false;
+      const next = new Map(prev);
+      for (const session of sessions) {
+        const agent = next.get(session.id);
+        if (agent && !names.has(agent)) {
+          next.delete(session.id);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [availableAgents, sessions]);
 
   // Listen for session updates via SSE for all instances
   const handleSessionEvent = useCallback(
@@ -466,12 +538,13 @@ export function App() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             parts: [{ type: "text", text }],
+            ...(selectedAgent ? { agent: selectedAgent } : {}),
             ...(selectedModel ? { model: selectedModel } : {}),
           }),
         },
       );
     },
-    [selectedInstance, ensureSession, selectedModel],
+    [selectedInstance, ensureSession, selectedAgent, selectedModel],
   );
 
   // Shell command — synchronous, SSE delivers streaming updates
@@ -484,11 +557,11 @@ export function App() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ agent: "build", command }),
+          body: JSON.stringify({ agent: effectiveAgent, command }),
         },
       );
     },
-    [selectedInstance, ensureSession],
+    [selectedInstance, ensureSession, effectiveAgent],
   );
 
   // --- Dictation ---
@@ -680,6 +753,21 @@ export function App() {
       else next.delete(sessionId);
       return next;
     });
+  }, [selectedSession, ensureSession]);
+
+  const handleAgentSelect = useCallback(async (agent: string | null) => {
+    const sessionId = agent ? await ensureSession() : selectedSession;
+    if (!sessionId) {
+      setAgentMenuOpen(false);
+      return;
+    }
+    setSessionAgents((prev) => {
+      const next = new Map(prev);
+      if (agent) next.set(sessionId, agent);
+      else next.delete(sessionId);
+      return next;
+    });
+    setAgentMenuOpen(false);
   }, [selectedSession, ensureSession]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -952,50 +1040,92 @@ export function App() {
                 placeholder="Type a message..."
                 rows={2}
               />
-              {whisperUrl && (
+              <div class="input-area-actions" ref={agentMenuRef}>
                 <button
                   type="button"
-                  class={`btn btn-icon${recording ? " btn-icon--recording" : ""}`}
-                  disabled={!whisperAvailable && !recording}
+                  class="btn input-agent-btn"
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={handleDictation}
-                  aria-label={!whisperAvailable ? "Transcription unavailable" : recording ? "Stop recording" : "Start dictation"}
+                  onClick={() => setAgentMenuOpen((open) => !open)}
+                  aria-haspopup="menu"
+                  aria-expanded={agentMenuOpen}
                 >
-                  {!whisperAvailable ? (
-                    /* mdi:microphone-off — disabled/unreachable */
-                    <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                      <path d="M19,11C19,12.19 18.66,13.3 18.1,14.28L16.87,13.05C17.14,12.43 17.3,11.74 17.3,11H19M15,11.16L9,5.18V5A3,3 0 0,1 12,2A3,3 0 0,1 15,5V11L15,11.16M4.27,3L21,19.73L19.73,21L15.54,16.81C14.77,17.27 13.91,17.58 13,17.72V21H11V17.72C7.72,17.23 5,14.41 5,11H6.7C6.7,14 9.24,16.1 12,16.1C12.81,16.1 13.6,15.91 14.31,15.58L12.65,13.92L12,14A3,3 0 0,1 9,11V10.28L3,4.27L4.27,3Z" />
-                    </svg>
-                  ) : recording ? (
-                    /* mdi:microphone-outline — recording active */
-                    <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                      <path d="M17,11C17,13.76 14.76,16 12,16C9.24,16 7,13.76 7,11H5C5,14.53 7.61,17.44 11,17.93V21H13V17.93C16.39,17.44 19,14.53 19,11M12,4A1,1 0 0,0 11,5V11A1,1 0 0,0 12,12A1,1 0 0,0 13,11V5A1,1 0 0,0 12,4M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2Z" />
-                    </svg>
-                  ) : (
-                    /* mdi:microphone — idle/ready */
-                    <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                      <path d="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z" />
-                    </svg>
-                  )}
+                  {currentAgentLabel}
                 </button>
-              )}
-              <button
-                type="button"
-                class="btn btn-icon"
-                disabled={!busy}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={handleStop}
-                aria-label="Stop"
-              >
-                <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M9,9H15V15H9" />
-                </svg>
-              </button>
-              <button type="submit" class="btn btn-icon" onMouseDown={(e) => e.preventDefault()} aria-label="Send">
-                <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path d="M15,20H9V12H4.16L12,4.16L19.84,12H15V20Z" />
-                </svg>
-              </button>
+                {agentMenuOpen && (
+                  <div class="agent-menu" role="menu" aria-label="Switch agent">
+                    <button
+                      type="button"
+                      class="agent-menu-item"
+                      aria-selected={selectedAgent === null}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => handleAgentSelect(null)}
+                    >
+                      <span class="agent-menu-item-name">Default</span>
+                      <span class="agent-menu-item-description">{defaultAgent}</span>
+                    </button>
+                    {availableAgents.map((agent) => (
+                      <button
+                        key={agent.name}
+                        type="button"
+                        class="agent-menu-item"
+                        role="menuitemradio"
+                        aria-checked={selectedAgent === agent.name}
+                        aria-selected={selectedAgent === agent.name}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => handleAgentSelect(agent.name)}
+                      >
+                        <span class="agent-menu-item-name">{agent.name}</span>
+                        {agent.description && (
+                          <span class="agent-menu-item-description">{agent.description}</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div class="input-area-action-buttons">
+                  {whisperUrl && (
+                    <button
+                      type="button"
+                      class={`btn btn-icon${recording ? " btn-icon--recording" : ""}`}
+                      disabled={!whisperAvailable && !recording}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={handleDictation}
+                      aria-label={!whisperAvailable ? "Transcription unavailable" : recording ? "Stop recording" : "Start dictation"}
+                    >
+                      {!whisperAvailable ? (
+                        <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                          <path d="M19,11C19,12.19 18.66,13.3 18.1,14.28L16.87,13.05C17.14,12.43 17.3,11.74 17.3,11H19M15,11.16L9,5.18V5A3,3 0 0,1 12,2A3,3 0 0,1 15,5V11L15,11.16M4.27,3L21,19.73L19.73,21L15.54,16.81C14.77,17.27 13.91,17.58 13,17.72V21H11V17.72C7.72,17.23 5,14.41 5,11H6.7C6.7,14 9.24,16.1 12,16.1C12.81,16.1 13.6,15.91 14.31,15.58L12.65,13.92L12,14A3,3 0 0,1 9,11V10.28L3,4.27L4.27,3Z" />
+                        </svg>
+                      ) : recording ? (
+                        <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                          <path d="M17,11C17,13.76 14.76,16 12,16C9.24,16 7,13.76 7,11H5C5,14.53 7.61,17.44 11,17.93V21H13V17.93C16.39,17.44 19,14.53 19,11M12,4A1,1 0 0,0 11,5V11A1,1 0 0,0 12,12A1,1 0 0,0 13,11V5A1,1 0 0,0 12,4M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2Z" />
+                        </svg>
+                      ) : (
+                        <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                          <path d="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z" />
+                        </svg>
+                      )}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    class="btn btn-icon"
+                    disabled={!busy}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={handleStop}
+                    aria-label="Stop"
+                  >
+                    <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M9,9H15V15H9" />
+                    </svg>
+                  </button>
+                  <button type="submit" class="btn btn-icon" onMouseDown={(e) => e.preventDefault()} aria-label="Send">
+                    <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M15,20H9V12H4.16L12,4.16L19.84,12H15V20Z" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
             </div>
           </form>
         )}

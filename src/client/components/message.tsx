@@ -260,8 +260,12 @@ export function Message({ role, parts, info, showRole }: Props) {
       {showRole && (
         <h3 class="message-role">
           {role}
-          {role === "assistant" && info?.modelID && (
-            <span> ({info.modelID})</span>
+          {role === "assistant" && (info?.agent || info?.modelID) && (
+            <span>
+              {" ("}
+              {[info?.agent, info?.modelID].filter(Boolean).join(" / ")}
+              {")"}
+            </span>
           )}
         </h3>
       )}

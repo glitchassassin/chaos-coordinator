@@ -858,6 +858,95 @@ code[class*="language-"] {
 .input-area-controls {
   display: flex;
   gap: 0.5rem;
+  align-items: stretch;
+}
+
+.input-area-actions {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: stretch;
+  flex-shrink: 0;
+}
+
+.input-area-action-buttons {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+  justify-content: space-between;
+}
+
+.input-agent-btn {
+  min-width: 11rem;
+  justify-content: flex-start;
+  padding: 0.5rem 0.75rem;
+  font-size: var(--text-body);
+  line-height: 1.2;
+  text-transform: none;
+}
+
+.input-agent-btn:focus {
+  outline: 2px solid #000;
+  outline-offset: 2px;
+}
+
+.input-agent-btn:active {
+  opacity: 0.85;
+}
+
+.agent-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 0.5rem);
+  width: min(22rem, calc(100vw - 2rem));
+  padding: 0.25rem;
+  border: 2px solid #000;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  z-index: 2;
+}
+
+.agent-menu-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 2px solid transparent;
+  background: #fff;
+  color: #000;
+  text-align: left;
+  font-family: inherit;
+  font-size: var(--text-body);
+  line-height: 1.3;
+}
+
+.agent-menu-item[aria-selected="true"] {
+  border-left: 4px solid #000;
+  font-weight: bold;
+}
+
+.agent-menu-item:focus {
+  outline: 2px solid #000;
+  outline-offset: 2px;
+}
+
+.agent-menu-item:active {
+  background: #000;
+  color: #fff;
+}
+
+.agent-menu-item-name {
+  display: block;
+}
+
+.agent-menu-item-description {
+  display: block;
+  font-size: var(--text-caption);
+  font-weight: normal;
 }
 
 .mention-insert-btn {
@@ -884,6 +973,31 @@ code[class*="language-"] {
   color: #000;
   resize: vertical;
   min-height: 44px;
+}
+
+@media (max-width: 900px) {
+  .input-area-controls {
+    flex-direction: column;
+  }
+
+  .input-area-actions {
+    width: 100%;
+  }
+
+  .input-area-action-buttons {
+    justify-content: space-between;
+  }
+
+  .input-agent-btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .agent-menu {
+    left: 0;
+    right: auto;
+    width: 100%;
+  }
 }
 
 /* Empty states */

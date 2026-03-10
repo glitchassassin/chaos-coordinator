@@ -139,6 +139,21 @@ export interface ModelKey {
   modelID: string;
 }
 
+// Agent types from GET /agent
+export interface AgentInfo {
+  name: string;
+  description?: string;
+  mode: "subagent" | "primary" | "all";
+  hidden?: boolean;
+  color?: string;
+  variant?: string;
+  model?: {
+    providerID: string;
+    modelID: string;
+  };
+  [key: string]: unknown;
+}
+
 // Filesystem entry for directory picker
 export interface FsEntry {
   name: string;
