@@ -4,15 +4,75 @@ import { Message } from "./message.js";
 import { PermissionBanner } from "./permission-banner.js";
 import { QuestionBanner } from "./question-banner.js";
 import { useSSE } from "../hooks/use-sse.js";
-import type { MessageWithParts, SSEEvent, PermissionRequest, QuestionRequest } from "../types.js";
+import { summarizePatch } from "../util/diff.js";
+import type { MessageWithParts, SSEEvent, PermissionRequest, QuestionRequest, Session } from "../types.js";
 
 interface Props {
   instanceId: string;
   sessionId: string;
+  session: Session | null;
   messages: MessageWithParts[];
+  snapshotEnabled: boolean;
+  onForkSession: (messageId: string) => void | Promise<void>;
+  onRevertMessage: (messageId: string) => void | Promise<void>;
+  onUnrevertSession: () => void | Promise<void>;
 }
 
-export function Chat({ instanceId, sessionId, messages }: Props) {
+function RevertBoundary({
+  count,
+  diff,
+  onUnrevert,
+}: {
+  count: number;
+  diff: string | undefined;
+  onUnrevert: () => void | Promise<void>;
+}) {
+  const files = diff ? summarizePatch(diff) : [];
+  return (
+    <div class="revert-boundary">
+      <div class="revert-boundary-header">
+        <div>
+          <div class="revert-boundary-title">{count} message{count === 1 ? "" : "s"} reverted</div>
+          <div class="revert-boundary-text">Continue from this point or restore the hidden messages.</div>
+        </div>
+        <button
+          class="btn revert-boundary-btn revert-boundary-btn--icon"
+          onClick={() => void onUnrevert()}
+          aria-label="Restore reverted messages"
+          title="Restore reverted messages"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+            <path d="M13,18V6L21.5,12L13,18M2.5,18V6L11,12L2.5,18Z" />
+          </svg>
+        </button>
+      </div>
+      {files.length > 0 && (
+        <div class="revert-boundary-files">
+          {files.map((file) => (
+            <div key={file.path} class="revert-boundary-file">
+              <span>{file.path}</span>
+              <span>
+                {file.additions > 0 && ` +${file.additions}`}
+                {file.deletions > 0 && ` -${file.deletions}`}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function Chat({
+  instanceId,
+  sessionId,
+  session,
+  messages,
+  snapshotEnabled,
+  onForkSession,
+  onRevertMessage,
+  onUnrevertSession,
+}: Props) {
   const [pendingPermissions, setPendingPermissions] = useState<PermissionRequest[]>([]);
   const [pendingQuestions, setPendingQuestions] = useState<QuestionRequest[]>([]);
   const chatRef = useRef<HTMLDivElement>(null);
@@ -142,21 +202,38 @@ export function Chat({ instanceId, sessionId, messages }: Props) {
     [instanceId],
   );
 
+  const revertMessageId = session?.revert?.messageID;
+  const revertIndex = revertMessageId ? messages.findIndex((message) => message.info.id === revertMessageId) : -1;
+  const visibleMessages = revertIndex >= 0 ? messages.slice(0, revertIndex) : messages;
+  const revertedCount =
+    revertIndex >= 0
+      ? messages.slice(revertIndex).filter((message) => message.info.role === "user").length
+      : 0;
+
   return (
     <div class="chat-container">
       <div class="chat" ref={chatRef}>
         {messages.length === 0 && (
           <div class="empty-state">No messages yet. Start a conversation.</div>
         )}
-        {messages.map((m, i) => (
+        {visibleMessages.map((m, i) => (
           <Message
             key={m.info.id}
             role={m.info.role}
             parts={m.parts}
             info={m.info}
-            showRole={i === 0 || messages[i - 1].info.role !== m.info.role}
+            showRole={i === 0 || visibleMessages[i - 1].info.role !== m.info.role}
+            onFork={m.info.role === "user" ? () => onForkSession(m.info.id) : undefined}
+            onRevert={snapshotEnabled && m.info.role === "user" ? () => onRevertMessage(m.info.id) : undefined}
           />
         ))}
+        {revertIndex >= 0 && (
+          <RevertBoundary
+            count={revertedCount}
+            diff={session?.revert?.diff}
+            onUnrevert={onUnrevertSession}
+          />
+        )}
         <QuestionBanner questions={pendingQuestions} onReply={replyQuestion} onReject={rejectQuestion} />
       </div>
       <PermissionBanner permissions={pendingPermissions} onReply={replyPermission} />

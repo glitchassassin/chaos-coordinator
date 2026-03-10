@@ -12,6 +12,13 @@ export interface Session {
   id: string;
   title?: string;
   directory?: string;
+  parentID?: string;
+  revert?: {
+    messageID: string;
+    partID?: string;
+    snapshot?: string;
+    diff?: string;
+  };
   time?: { created?: number; updated?: number; archived?: number };
 }
 

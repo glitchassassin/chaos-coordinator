@@ -7,6 +7,12 @@ export interface DiffLine {
   newNo: number | null;
 }
 
+export interface DiffFileSummary {
+  path: string;
+  additions: number;
+  deletions: number;
+}
+
 export const INDICATOR: Record<string, string> = {
   add: "+",
   remove: "\u2212",
@@ -50,4 +56,34 @@ export function highlightLines(
     if (!line.content) return "";
     return language ? highlight(line.content, language) : escapeHtml(line.content);
   });
+}
+
+export function summarizePatch(patch: string): DiffFileSummary[] {
+  const files: DiffFileSummary[] = [];
+  let current: DiffFileSummary | null = null;
+
+  for (const raw of patch.split("\n")) {
+    if (raw.startsWith("diff --git ")) {
+      if (current) files.push(current);
+      const match = raw.match(/^diff --git a\/(.+) b\/(.+)$/);
+      const path = match?.[2] || match?.[1] || "unknown";
+      current = { path, additions: 0, deletions: 0 };
+      continue;
+    }
+
+    if (raw.startsWith("+++ ")) {
+      if (!current) {
+        const path = raw.replace(/^\+\+\+ [ab]\//, "").replace(/^\+\+\+ /, "") || "unknown";
+        current = { path, additions: 0, deletions: 0 };
+      }
+      continue;
+    }
+
+    if (!current || raw.startsWith("+++ ") || raw.startsWith("--- ")) continue;
+    if (raw.startsWith("+")) current.additions++;
+    if (raw.startsWith("-")) current.deletions++;
+  }
+
+  if (current) files.push(current);
+  return files;
 }

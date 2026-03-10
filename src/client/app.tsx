@@ -32,6 +32,23 @@ function unreadSessionKey(instanceId: string, sessionId: string): string {
   return `${instanceId}:${sessionId}`;
 }
 
+function mergeSession(list: Session[], info: Session): Session[] {
+  const idx = list.findIndex((s) => s.id === info.id);
+  if (idx >= 0) {
+    const next = [...list];
+    next[idx] = info;
+    return next;
+  }
+  return [...list, info];
+}
+
+function messagePrompt(parts: Part[]): string {
+  return parts
+    .filter((part): part is Part & { type: "text"; text: string } => part.type === "text" && typeof part.text === "string")
+    .map((part) => part.text)
+    .join("");
+}
+
 export function App() {
   const [instances, setInstances] = useState<Instance[]>([]);
   const [selectedInstance, setSelectedInstance] = useState<string | null>(
@@ -65,6 +82,8 @@ export function App() {
   // requestId -> { sessionId, instanceId } for pending permission tracking
   const [pendingPermissions, setPendingPermissions] = useState<Map<string, { sessionId: string; instanceId: string }>>(() => new Map());
   const [agentMenuOpen, setAgentMenuOpen] = useState(false);
+  const [snapshotEnabled, setSnapshotEnabled] = useState(false);
+  const [gitBacked, setGitBacked] = useState(false);
 
   const selectedSessionRef = useRef<string | null>(selectedSession);
   const selectedInstanceRef = useRef<string | null>(selectedInstance);
@@ -87,10 +106,49 @@ export function App() {
   useEffect(() => { selectedInstanceRef.current = selectedInstance; }, [selectedInstance]);
   useEffect(() => { instancesRef.current = instances; }, [instances]);
 
+  useEffect(() => {
+    if (!selectedInstance) {
+      setSnapshotEnabled(false);
+      setGitBacked(false);
+      return;
+    }
+
+    let cancelled = false;
+    fetch(apiUrl(selectedInstance, "/config"))
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((config: { snapshot?: boolean }) => {
+        if (!cancelled) setSnapshotEnabled(config.snapshot !== false);
+      })
+      .catch(() => {
+        if (!cancelled) setSnapshotEnabled(false);
+      });
+
+    fetch(`/api/instances/${selectedInstance}/git/info`)
+      .then((r) => (r.ok ? r.json() : { branch: null }))
+      .then((info: { branch: string | null }) => {
+        if (!cancelled) setGitBacked(Boolean(info.branch));
+      })
+      .catch(() => {
+        if (!cancelled) setGitBacked(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedInstance]);
+
   const availableAgents = selectedInstance ? (instanceAgents.get(selectedInstance) ?? []) : [];
   const defaultAgent = availableAgents[0]?.name ?? "build";
   const effectiveAgent = selectedAgent ?? defaultAgent;
   const currentAgentLabel = selectedAgent ? selectedAgent : `Default (${defaultAgent})`;
+  const selectedSessionInfo = selectedSession ? (sessions.find((session) => session.id === selectedSession) ?? null) : null;
+
+  const fetchSessionMessages = useCallback(async (instanceId: string, sessionId: string) => {
+    const r = await fetch(apiUrl(instanceId, `/session/${sessionId}/message`));
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data: MessageWithParts[] | Record<string, MessageWithParts> = await r.json();
+    return Array.isArray(data) ? data : Object.values(data || {});
+  }, []);
 
   const loadInstances = useCallback(() => {
     fetch("/api/instances")
@@ -316,15 +374,7 @@ export function App() {
           if (!matchesInstanceDirectory(info, instanceDirectory)) return;
           // Only update sessions state if event is from the currently selected instance
           if (instanceId === selectedInstanceRef.current) {
-            setSessions((prev) => {
-              const idx = prev.findIndex((s) => s.id === info.id);
-              if (idx >= 0) {
-                const updated = [...prev];
-                updated[idx] = { ...updated[idx], ...info };
-                return updated;
-              }
-              return [...prev, info];
-            });
+            setSessions((prev) => mergeSession(prev, info));
           }
           // Mark unread if this isn't the currently open session
           if (info.id !== selectedSessionRef.current) {
@@ -480,14 +530,9 @@ export function App() {
     const maxRetries = 15;
 
     const fetchMessages = () => {
-      fetch(apiUrl(selectedInstance, `/session/${selectedSession}/message`))
-        .then((r) => {
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          return r.json();
-        })
-        .then((data: MessageWithParts[] | Record<string, MessageWithParts>) => {
+      fetchSessionMessages(selectedInstance, selectedSession)
+        .then((list) => {
           if (cancelled) return;
-          const list: MessageWithParts[] = Array.isArray(data) ? data : Object.values(data || {});
           setMessages(list);
         })
         .catch((e) => {
@@ -510,7 +555,7 @@ export function App() {
         messageRetryRef.current = null;
       }
     };
-  }, [selectedInstance, selectedSession]);
+  }, [selectedInstance, selectedSession, fetchSessionMessages]);
 
   // Ensure a session exists, returning its ID
   const ensureSession = useCallback(async (): Promise<string | null> => {
@@ -722,6 +767,26 @@ export function App() {
 
   // --- End dictation ---
 
+  const seedComposer = useCallback((sessionId: string, text: string) => {
+    setInput(text);
+    draftRef.current.set(sessionId, text);
+    baseInputRef.current = text;
+    insertPosRef.current = text.length;
+    dictationTextRef.current = "";
+    cursorPosRef.current = text.length;
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(text.length, text.length);
+    });
+  }, []);
+
+  const promptForMessage = useCallback((messageId: string) => {
+    const message = messages.find((item) => item.info.id === messageId);
+    return message ? messagePrompt(message.parts) : "";
+  }, [messages]);
+
   const handleSubmit = useCallback(async () => {
     const text = input.trim();
     if (!text || !selectedInstance) return;
@@ -782,6 +847,75 @@ export function App() {
       cursorPosRef.current = textareaRef.current.selectionStart ?? 0;
     }
   }, []);
+
+  const handleForkSession = useCallback(async (messageId: string) => {
+    if (!selectedInstance || !selectedSession) return;
+    try {
+      const res = await fetch(apiUrl(selectedInstance, `/session/${selectedSession}/fork`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageID: messageId }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const session: Session = await res.json();
+      const text = promptForMessage(messageId);
+      setSessions((prev) => mergeSession(prev, session));
+      if (text) seedComposer(session.id, text);
+      setSelectedSession(session.id);
+      setSessionView("chat");
+    } catch (e) {
+      console.error("Failed to fork session:", e);
+    }
+  }, [selectedInstance, selectedSession, promptForMessage, seedComposer]);
+
+  const handleRevertMessage = useCallback(async (messageId: string) => {
+    if (!selectedInstance || !selectedSession) return;
+    try {
+      const res = await fetch(apiUrl(selectedInstance, `/session/${selectedSession}/revert`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageID: messageId }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const session: Session = await res.json();
+      const list = await fetchSessionMessages(selectedInstance, selectedSession);
+      setSessions((prev) => mergeSession(prev, session));
+      if (selectedInstanceRef.current === selectedInstance && selectedSessionRef.current === selectedSession) {
+        setMessages(list);
+      }
+      const text = promptForMessage(messageId);
+      if (text) seedComposer(selectedSession, text);
+      setSessionView("chat");
+    } catch (e) {
+      console.error("Failed to revert session:", e);
+    }
+  }, [selectedInstance, selectedSession, fetchSessionMessages, promptForMessage, seedComposer]);
+
+  const handleUnrevertSession = useCallback(async () => {
+    if (!selectedInstance || !selectedSession) return;
+    try {
+      const res = await fetch(apiUrl(selectedInstance, `/session/${selectedSession}/unrevert`), {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const session: Session = await res.json();
+      const list = await fetchSessionMessages(selectedInstance, selectedSession);
+      setSessions((prev) => mergeSession(prev, session));
+      if (selectedInstanceRef.current === selectedInstance && selectedSessionRef.current === selectedSession) {
+        setMessages(list);
+      }
+      draftRef.current.delete(selectedSession);
+      setInput("");
+      baseInputRef.current = "";
+      insertPosRef.current = 0;
+      dictationTextRef.current = "";
+      cursorPosRef.current = 0;
+      setSessionView("chat");
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    } catch (e) {
+      console.error("Failed to restore session:", e);
+    }
+  }, [selectedInstance, selectedSession, fetchSessionMessages]);
 
   const handleInsertMention = useCallback((filePath: string, startLine: number, endLine: number) => {
     const rootPath = instances.find((i) => i.id === selectedInstance)?.directory || "";
@@ -1004,7 +1138,12 @@ export function App() {
           <Chat
             instanceId={selectedInstance}
             sessionId={selectedSession ?? ""}
+            session={selectedSessionInfo}
             messages={selectedSession ? messages : []}
+            snapshotEnabled={snapshotEnabled && gitBacked}
+            onForkSession={handleForkSession}
+            onRevertMessage={handleRevertMessage}
+            onUnrevertSession={handleUnrevertSession}
           />
         )}
         {selectedInstance && view !== "new-instance" && (

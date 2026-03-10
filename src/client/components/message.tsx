@@ -8,6 +8,24 @@ interface Props {
   parts: Part[];
   info?: MessageInfo;
   showRole?: boolean;
+  onFork?: () => void | Promise<void>;
+  onRevert?: () => void | Promise<void>;
+}
+
+function ForkIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+      <path d="M15,4A3,3 0 0,1 18,7A3,3 0 0,1 15,10C14.3,10 13.66,9.76 13.15,9.35L9.91,11.2C9.97,11.46 10,11.73 10,12A4,4 0 0,1 9.91,12.8L13.15,14.65C13.66,14.24 14.3,14 15,14A3,3 0 0,1 18,17A3,3 0 0,1 15,20A3,3 0 0,1 12,17C12,16.73 12.03,16.46 12.09,16.2L8.85,14.35C8.34,14.76 7.7,15 7,15A3,3 0 0,1 4,12A3,3 0 0,1 7,9C7.7,9 8.34,9.24 8.85,9.65L12.09,7.8C12.03,7.54 12,7.27 12,7A3,3 0 0,1 15,4Z" />
+    </svg>
+  );
+}
+
+function RewindIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+      <path d="M11,18V6L2.5,12L11,18M21.5,18V6L13,12L21.5,18Z" />
+    </svg>
+  );
 }
 
 function ExpandIcon() {
@@ -247,7 +265,7 @@ function renderPart(part: Part, i: number, role: string) {
   }
 }
 
-export function Message({ role, parts, info, showRole }: Props) {
+export function Message({ role, parts, info, showRole, onFork, onRevert }: Props) {
   const msgError = info?.error as ApiError | undefined;
   // Skip messages with no visible parts and no error
   const hasVisible = parts.some(
@@ -255,21 +273,39 @@ export function Message({ role, parts, info, showRole }: Props) {
   );
   if (!hasVisible && parts.length > 0 && !msgError) return null;
 
+  const hasActions = Boolean(onFork || onRevert);
+
   return (
     <article class={`message message--${role}`}>
       {showRole && (
-        <h3 class="message-role">
-          {role}
-          {role === "assistant" && (info?.agent || info?.modelID) && (
-            <span>
-              {" ("}
-              {[info?.agent, info?.modelID].filter(Boolean).join(" / ")}
-              {")"}
-            </span>
-          )}
-        </h3>
+        <div class="message-header">
+          <h3 class="message-role">
+            {role}
+            {role === "assistant" && (info?.agent || info?.modelID) && (
+              <span>
+                {" ("}
+                {[info?.agent, info?.modelID].filter(Boolean).join(" / ")}
+                {")"}
+              </span>
+            )}
+          </h3>
+        </div>
       )}
       {parts.map((p, i) => renderPart(p, i, role))}
+      {hasActions && (
+        <div class="message-actions message-actions--below">
+          {onFork && (
+            <button class="message-action-btn message-action-btn--icon" onClick={() => void onFork()} aria-label="Fork from this message" title="Fork from this message">
+              <ForkIcon />
+            </button>
+          )}
+          {onRevert && (
+            <button class="message-action-btn message-action-btn--icon" onClick={() => void onRevert()} aria-label="Revert to this message" title="Revert to this message">
+              <RewindIcon />
+            </button>
+          )}
+        </div>
+      )}
       {msgError && <ApiErrorView error={msgError} />}
     </article>
   );
