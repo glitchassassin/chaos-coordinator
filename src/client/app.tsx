@@ -790,11 +790,11 @@ export function App() {
   const handleSubmit = useCallback(async () => {
     const text = input.trim();
     if (!text || !selectedInstance) return;
+    if (recording) stopDictation();
     setInput("");
     baseInputRef.current = "";
     insertPosRef.current = 0;
     dictationTextRef.current = "";
-    if (recording) connectWhisper(); // reconnect to reset transcript
     if (selectedSession) draftRef.current.delete(selectedSession);
     setSessionView("chat");
     if (text.startsWith("!")) {
@@ -802,7 +802,7 @@ export function App() {
     } else {
       await handleSendMessage(text);
     }
-  }, [input, selectedInstance, selectedSession, handleSendMessage, handleSendShell, recording, connectWhisper]);
+  }, [input, selectedInstance, selectedSession, handleSendMessage, handleSendShell, recording, stopDictation]);
 
   const handleStop = useCallback(async () => {
     if (!selectedInstance || !selectedSession) return;
